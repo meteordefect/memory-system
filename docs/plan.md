@@ -1,6 +1,6 @@
 # Build Plan: Company Brain
 
-One Render blueprint. One web service. Two MCP tools. Fifteen-minute freshness.
+One Render blueprint. One web service. Three MCP tools. Fifteen-minute freshness.
 
 The brain indexes one shared Google Drive folder and exposes that index over MCP. Claude connects to the Render HTTPS URL and searches it. The model the person already pays for writes the answer. This server searches and lists. It does not write answers, and it does not fetch URLs the model sends.
 
@@ -42,8 +42,8 @@ Yes, for the job it is: Claude searches documents from one Drive folder, on the 
 | ChatGPT | Waits for OAuth. Not part of the first deploy. |
 | Tools | `search` and `list_sources`. Ingest stays on the server. |
 | Files | Google Docs, Sheets, and Slides, plus pdf, docx, xlsx, md, and txt. Subfolders included. Other types are skipped and counted. |
-| Deletes | Each run lists every file id in the folder. A `modifiedTime` filter never sees a deletion. |
-| Replace | One transaction per file: delete that file's chunks, insert the new ones. A shorter file must not leave old chunks behind. |
+| Deletes | Each run lists every file id in the folder. Chunks whose file left the folder get `deleted_at` set. Search skips those rows. |
+| Replace | One transaction per file: soft-delete that file's live chunks, insert the new ones. A shorter file must not leave old chunks in search. |
 | Queue | One file at a time. After a file is written, its Drive modified time is stored. A restart skips files already stored. Embeddings run 8 chunks at a time, on one ONNX thread. A PDF is read one page at a time. |
 | Embedder | `BAAI/bge-small-en-v1.5`, 384 dims, ONNX. Queries use that model's search prefix. Passages do not. |
 | Keyword | Postgres `tsvector` only. Merge with the vector hits in the app (reciprocal rank fusion). |
@@ -73,10 +73,11 @@ Exposed at `/mcp`, stateless Streamable HTTP. Every request must carry `Authoriz
 
 | Tool | Input | Returns |
 | --- | --- | --- |
-| `search` | `query: str`, `top_k: int = 5` | Top chunks with source filename and score |
-| `list_sources` | — | Indexed files, chunk counts, last successful sync time |
+| `search` | `query: str`, `top_k: int = 5` | Top chunks with source filename, chunk id, and score |
+| `list_sources` | — | Indexed files, live chunk counts, last successful sync time |
+| `feedback` | `chunk_id: int`, `verdict: useful \| wrong \| outdated`, optional `note` | Stores a row in `chunk_feedback` and updates that chunk's counters |
 
-`search` takes the top vector hits and the top `tsvector` hits, fuses them, and returns `top_k`. The tool text tells the model the chunks are untrusted document text.
+`search` takes the top vector hits and the top `tsvector` hits, fuses them, and returns `top_k`. It increments `shown_count` on those chunks. Default search skips soft-deleted chunks and chunks whose `decay_score` is below 0.25. The tool text tells the model the chunks are untrusted document text. `feedback` does not edit Drive. `useful` bumps `useful_count` and `last_useful_at`. `wrong` and `outdated` lower `decay_score`.
 
 ## Ingestion
 
@@ -95,8 +96,8 @@ Exposed at `/mcp`, stateless Streamable HTTP. Every request must carry `Authoriz
    - anything else → skip, and count it
 4. Chunk with the BGE tokenizer, 512 tokens, 64 overlap.
 5. Embed the passages with BGE-small.
-6. In one transaction: delete rows for that Drive file id, insert the new chunks.
-7. Delete rows whose file id is no longer in the folder listing.
+6. In one transaction: set `deleted_at` on that Drive file's live chunks, insert the new chunks.
+7. Set `deleted_at` on rows whose file id is no longer in the folder listing.
 8. If every chosen file succeeded, set `last_success` to the time this run started. A failed file is retried next run. A file that fails does not block the others.
 
 Auth is a Google Cloud service account, scope `drive.readonly`. On Render the JSON is the env var `GDRIVE_SERVICE_ACCOUNT_JSON`. The folder id is `GDRIVE_FOLDER_ID`. Share that folder with the service account email.
@@ -109,18 +110,34 @@ A local test can load one fixture file through a function in the same chunk → 
 CREATE EXTENSION IF NOT EXISTS vector;
 
 CREATE TABLE facts (
-    id          BIGSERIAL PRIMARY KEY,
-    source_id   TEXT NOT NULL,
-    source_name TEXT NOT NULL,
-    chunk_idx   INT NOT NULL,
-    content     TEXT NOT NULL,
-    embedding   vector(384) NOT NULL,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (source_id, chunk_idx)
+    id             BIGSERIAL PRIMARY KEY,
+    source_id      TEXT NOT NULL,
+    source_name    TEXT NOT NULL,
+    chunk_idx      INT NOT NULL,
+    content        TEXT NOT NULL,
+    embedding      vector(384) NOT NULL,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    useful_count   INTEGER NOT NULL DEFAULT 0,
+    shown_count    INTEGER NOT NULL DEFAULT 0,
+    last_useful_at TIMESTAMPTZ,
+    decay_score    REAL NOT NULL DEFAULT 1,
+    deleted_at     TIMESTAMPTZ
 );
+
+CREATE UNIQUE INDEX facts_live_source_chunk
+    ON facts (source_id, chunk_idx)
+    WHERE deleted_at IS NULL;
 
 CREATE INDEX facts_content_fts
     ON facts USING gin (to_tsvector('english', content));
+
+CREATE TABLE chunk_feedback (
+    id         BIGSERIAL PRIMARY KEY,
+    fact_id    BIGINT NOT NULL REFERENCES facts (id) ON DELETE CASCADE,
+    verdict    TEXT NOT NULL CHECK (verdict IN ('useful', 'wrong', 'outdated')),
+    note       TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
 CREATE TABLE meta (
     key   TEXT PRIMARY KEY,
@@ -128,6 +145,8 @@ CREATE TABLE meta (
 );
 -- meta: last_success = "2026-11-05T14:00:00Z"
 ```
+
+`decay_score` starts at 1. `useful` adds 0.25, capped at 1. `wrong` and `outdated` subtract 0.5, floored at 0. Ranking also applies a 90-day half-life from `last_useful_at` or `created_at`, and ranks a chunk lower when it is older than 30 days and has never been shown. Those time factors are applied in the search query. They are not written back onto `decay_score`.
 
 No ANN index. Search uses cosine distance on `embedding`. Add an HNSW index only if a later corpus makes exact search slow.
 

@@ -1,5 +1,5 @@
 from app.embed import embed_query
-from app.store import keyword_hits, vector_hits
+from app.store import keyword_hits, mark_shown, vector_hits
 from app.text import rrf
 
 
@@ -17,7 +17,9 @@ def search(conn, query: str, top_k: int = 5) -> list[dict]:
             [(hit["source_id"], hit["chunk_idx"]) for hit in keyword],
         ]
     )
-    return [by_key[key] for key in order[:top_k]]
+    hits = [by_key[key] for key in order[:top_k]]
+    mark_shown(conn, [hit["id"] for hit in hits])
+    return hits
 
 
 def format_hits(hits: list[dict]) -> str:
@@ -25,5 +27,5 @@ def format_hits(hits: list[dict]) -> str:
         return "The documents do not say."
     blocks = []
     for hit in hits:
-        blocks.append(f"Source: {hit['source_name']}\n{hit['content']}")
+        blocks.append(f"Chunk: {hit['id']}\nSource: {hit['source_name']}\n{hit['content']}")
     return "\n\n".join(blocks)

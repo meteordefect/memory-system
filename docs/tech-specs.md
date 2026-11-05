@@ -61,9 +61,15 @@ That is the usual queue for one process. A broker such as Redis, Celery, RQ, or 
 | PDF read | one page, then the reader is dropped | `_pdf_text` in `app/drive.py` |
 | PDF fonts | `fonttools` so embedded fonts decode | `requirements.txt` |
 | File cap | 20 MB, larger files are skipped | `MAX_BYTES` in `app/drive.py` |
-| Replace | one transaction per file | `replace_source` in `app/store.py` |
+| Replace | one transaction per file: soft-delete live chunks, then insert | `replace_source` in `app/store.py` |
 | Search | default 5 chunks, cap 20, pool 20 | `search` in `app/search.py` |
 | Merge | reciprocal rank fusion, k = 60 | `rrf` in `app/text.py` |
+| Shown | `shown_count` + 1 when a chunk is returned | `mark_shown`, called from `search` |
+| Feedback | `useful`, `wrong`, or `outdated` on a chunk id | `feedback` tool, rows in `chunk_feedback` |
+| Useful | `useful_count` and `last_useful_at`; decay +0.25, cap 1 | `record_feedback` in `app/store.py` |
+| Demote | wrong or outdated subtracts 0.5, floor 0 | `record_feedback` in `app/store.py` |
+| Hidden | `deleted_at` set, or `decay_score` below 0.25 | `vector_hits` and `keyword_hits` |
+| Freshness | 90-day half-life; never shown after 30 days ranks lower | `RANK_WEIGHT` in `app/store.py` |
 | Postgres | `shared_buffers` 64 MB, `work_mem` 8 MB, `maintenance_work_mem` 64 MB, `max_connections` 20 | `render-start.sh` |
 | Host | Render `1c-2g`, 2 GB, $25 a month. Disk 10 GB, $2.50 a month | `render.yaml` |
 
