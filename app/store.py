@@ -92,6 +92,11 @@ def known_sources(conn) -> set[str]:
     return {row[0] for row in rows}
 
 
+def stored_source_ids(conn) -> set[str]:
+    rows = conn.execute("SELECT DISTINCT source_id FROM facts").fetchall()
+    return {row[0] for row in rows}
+
+
 def source_mtimes(conn) -> dict[str, str]:
     rows = conn.execute("SELECT key, value FROM meta WHERE key LIKE 'mtime:%%'").fetchall()
     return {row[0][len("mtime:") :]: row[1] for row in rows}

@@ -29,7 +29,7 @@ Claude sends a question to `https://company-brain-xxxx.onrender.com/mcp` with a 
 
 ## Status
 
-Claude search is proven on a test service at `https://company-brain-4f8c.onrender.com/mcp` with the bearer key. The sample price list is in the index. Drive sync runs after `GDRIVE_FOLDER_ID` and `GDRIVE_SERVICE_ACCOUNT_JSON` are set and that folder is shared with the service account. The test service has both values. Files show up once the share is in place.
+Claude search is proven on a test service at `https://company-brain-4f8c.onrender.com/mcp` with the bearer key. The sample files in `sample/` are loaded into the index on boot when that file is not already stored: the price list, the bolt price, the 2024 rice price, and the Friday lunch rule. Drive sync runs after `GDRIVE_FOLDER_ID` and `GDRIVE_SERVICE_ACCOUNT_JSON` are set and that folder is shared with the service account. The test service has both values. Files show up once the share is in place.
 
 Staff sign-in by company email is WorkOS, and it is not part of this deploy. Today everyone who has the bearer key can search.
 
@@ -169,7 +169,7 @@ The header is still `Authorization`, and the value is `Bearer` plus the `MCP_API
 
 Ask Claude: "What sources are indexed?"
 
-The sample price list is there from the first boot. Drive files appear beside it after a sync. The first sync runs when the new deploy goes live. After that, the service checks the folder every 15 minutes, so a file added just after a sync can take that long to show up.
+The files in `sample/` are there from the first boot, and a later boot adds any sample file that is not stored yet. Drive files appear beside them after a sync. The first sync runs when the new deploy goes live. After that, the service checks the folder every 15 minutes, so a file added just after a sync can take that long to show up.
 
 These files are indexed, including files in subfolders:
 

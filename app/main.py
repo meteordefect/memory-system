@@ -13,10 +13,10 @@ from mcp.server.transport_security import TransportSecuritySettings
 
 from app.drive import start as start_drive
 from app.embed import embed_query
-from app.ingest import ingest_text
+from app.ingest import load_new_samples
 from app.search import format_hits
 from app.search import search as hybrid_search
-from app.store import connect, fact_count, init_schema, record_feedback
+from app.store import connect, init_schema, record_feedback
 from app.store import list_sources as indexed_sources
 
 log = logging.getLogger("company-brain")
@@ -81,9 +81,9 @@ async def lifespan(_app):
     _wait_for_db()
     with connect() as conn:
         init_schema(conn)
-        if fact_count(conn) == 0 and SAMPLE.is_file():
-            ingest_text(conn, "sample:price-list.md", "price-list.md", SAMPLE.read_text())
-            log.info("Loaded the sample price list")
+        sample_dir = SAMPLE if SAMPLE.is_dir() else SAMPLE.parent
+        for name in load_new_samples(conn, sample_dir):
+            log.info("Loaded sample %s", name)
     embed_query("ready")
     start_drive()
     async with mcp.session_manager.run():

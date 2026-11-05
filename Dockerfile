@@ -20,7 +20,7 @@ RUN python -c "from fastembed import TextEmbedding; TextEmbedding(model_name='BA
 
 COPY app /app/app
 COPY migrations /app/migrations
-COPY sample/price-list.md /app/sample/price-list.md
+COPY sample /app/sample
 COPY render-start.sh /render-start.sh
 RUN chmod 755 /render-start.sh
 

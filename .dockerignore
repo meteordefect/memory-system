@@ -7,4 +7,4 @@ scripts
 tests
 README.md
 *.md
-!sample/price-list.md
+!sample/*.md
