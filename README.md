@@ -29,7 +29,7 @@ Claude sends a question to `https://<service>.onrender.com/mcp` with a bearer ke
 
 ## Status
 
-Plan, not built. The spec is [docs/plan.md](docs/plan.md). The first milestone is a local test: Postgres, the two MCP tools, and a search against a loaded document. The Render blueprint is the step after that test passes.
+The container is in this branch. Render builds it, because the image is too large for this machine. The spec is [docs/plan.md](docs/plan.md). The first proof is `search` against the sample price list on the Render URL. Drive sync stays off until a folder id and a service account are set.
 
 `main` and `hindsight` still hold the earlier Hindsight workshop. This branch is the new build. The `render.yaml` in the tree is still that workshop's blueprint.
 

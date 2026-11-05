@@ -138,7 +138,7 @@ The thing a client can move is one container:
 - Postgres 16 with pgvector, listening on `127.0.0.1`
 - the BGE-small model, baked in
 
-`DATABASE_URL` defaults to `postgres://company_brain@127.0.0.1:5432/company_brain`. The data directory is `/var/lib/postgresql/data`, and the host mounts a volume there. Secrets are `MCP_API_KEY`, `GDRIVE_FOLDER_ID`, and `GDRIVE_SERVICE_ACCOUNT_JSON`. The process reads those variables and nothing about the host.
+`DATABASE_URL` defaults to `postgres://company_brain@127.0.0.1:5432/company_brain`. The host mounts a volume at `/var/lib/postgresql`. Postgres keeps its files in `data` under that volume. Secrets are `MCP_API_KEY`, `GDRIVE_FOLDER_ID`, and `GDRIVE_SERVICE_ACCOUNT_JSON`. The process reads those variables and nothing about the host.
 
 Render is the first host. Its blueprint attaches a 10 GB disk at that path and serves HTTPS. A later host runs the same image, mounts a volume at the same path, sets the same variables, and puts HTTPS in front. Claude then points at the new URL. The index moves by copying the volume, or by letting the next sync rebuild it from Drive.
 
@@ -165,7 +165,7 @@ services:
     autoDeployTrigger: "off"
     disk:
       name: company-brain-pg
-      mountPath: /var/lib/postgresql/data
+      mountPath: /var/lib/postgresql
       sizeGB: 10
     envVars:
       - key: DATABASE_URL
@@ -214,7 +214,7 @@ services:
       GDRIVE_SERVICE_ACCOUNT_JSON: ""
       GDRIVE_FOLDER_ID: ""
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
 
 volumes:
   pgdata:

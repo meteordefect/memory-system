@@ -1,6 +1,10 @@
 .git
 .env
-sample
+.env.*
+!.env.example
 docs
 scripts
+tests
+README.md
 *.md
+!sample/price-list.md
