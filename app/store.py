@@ -58,6 +58,11 @@ def known_sources(conn) -> set[str]:
     return {row[0] for row in rows}
 
 
+def source_mtimes(conn) -> dict[str, str]:
+    rows = conn.execute("SELECT key, value FROM meta WHERE key LIKE 'mtime:%%'").fetchall()
+    return {row[0][len("mtime:") :]: row[1] for row in rows}
+
+
 def replace_source(conn, source_id: str, source_name: str, pieces: list[tuple[int, str, list[float]]]) -> None:
     with conn.transaction():
         conn.execute("DELETE FROM facts WHERE source_id = %s", (source_id,))
@@ -78,6 +83,14 @@ def delete_absent(conn, keep_ids: set[str]) -> None:
             DELETE FROM facts
             WHERE source_id NOT LIKE 'sample:%%'
               AND NOT (source_id = ANY(%s::text[]))
+            """,
+            (list(keep_ids),),
+        )
+        conn.execute(
+            """
+            DELETE FROM meta
+            WHERE key LIKE 'mtime:%%'
+              AND NOT (substring(key FROM 7) = ANY(%s::text[]))
             """,
             (list(keep_ids),),
         )

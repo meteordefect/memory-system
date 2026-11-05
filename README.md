@@ -25,7 +25,7 @@ flowchart LR
   Drive -->|"read-only, every 15 min"| MCP
 ```
 
-Claude sends a question to `https://<service>.onrender.com/mcp` with a bearer key. The service embeds the question, searches the chunks, and returns the best ones. Every 15 minutes the same process reads the Drive folder and replaces the chunks for files that changed. ChatGPT uses this URL only after OAuth exists. Until then, Claude is the client.
+Claude sends a question to `https://company-brain-xxxx.onrender.com/mcp` with a bearer key. Render assigns the `xxxx` once, when that company deploys, so each service has its own host. The host stays the same on later deploys. The service embeds the question, searches the chunks, and returns the best ones. Every 15 minutes the same process reads the Drive folder and replaces the chunks for files that changed. ChatGPT uses this URL only after OAuth exists. Until then, Claude is the client.
 
 ## Status
 
@@ -62,7 +62,7 @@ Ingest is not a tool. The sync pulls the Drive folder. The model cannot send the
 
 ## What a sync does
 
-Every 15 minutes the service lists every file in the folder and its subfolders. Google Docs, Sheets, and Slides are exported to text. PDF, Word, Excel, Markdown, and plain text are read as files. Each changed file is chunked at 512 tokens with 64 overlap, embedded, and written in place of that file's old chunks. A file that left the folder loses its rows.
+Every 15 minutes the service lists every file in the folder and its subfolders. New and changed files go on a queue and are taken one at a time, so a first sync of many files does not load them together. Google Docs, Sheets, and Slides are exported to text. PDF, Word, Excel, Markdown, and plain text are read as files. A PDF is read one page at a time. Each file is chunked at about 512 tokens with 64 overlap. The model embeds 8 chunks at a time, the file is saved, and the next file starts. A restart skips files already saved and continues the rest. A file that left the folder loses its rows when that pass finishes.
 
 The Drive folder is shared with a Google Cloud service account. The account is read-only. On Render the key is `GDRIVE_SERVICE_ACCOUNT_JSON` and the folder id is `GDRIVE_FOLDER_ID`.
 
@@ -146,7 +146,25 @@ To add them after the service is already live:
 
 The key stays on Render. This repo does not contain one.
 
-### 7. Confirm in Claude
+### 7. Copy the service URL
+
+When the service is live, open it in the Render dashboard. The URL looks like this:
+
+```text
+https://company-brain-xxxx.onrender.com
+```
+
+The blueprint names every service `company-brain`. Render adds the `xxxx` so two companies do not land on the same host. Copy the host from that service page. It is assigned once and stays put on later deploys.
+
+In Claude, the connector URL is that host with `/mcp` on the end:
+
+```text
+https://company-brain-xxxx.onrender.com/mcp
+```
+
+The header is still `Authorization`, and the value is `Bearer` plus the `MCP_API_KEY` from the same service.
+
+### 8. Confirm in Claude
 
 Ask Claude: "What sources are indexed?"
 
@@ -180,4 +198,4 @@ Dockerfile            image, with BGE-small baked in
 app/                  MCP tools and the Drive sync
 ```
 
-Schema, the Blueprint, and the Claude steps are in [docs/plan.md](docs/plan.md).
+Schema, the Blueprint, and the Claude steps are in [docs/plan.md](docs/plan.md). Queue and chunk settings are in [docs/tech-specs.md](docs/tech-specs.md).

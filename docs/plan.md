@@ -44,6 +44,7 @@ Yes, for the job it is: Claude searches documents from one Drive folder, on the 
 | Files | Google Docs, Sheets, and Slides, plus pdf, docx, xlsx, md, and txt. Subfolders included. Other types are skipped and counted. |
 | Deletes | Each run lists every file id in the folder. A `modifiedTime` filter never sees a deletion. |
 | Replace | One transaction per file: delete that file's chunks, insert the new ones. A shorter file must not leave old chunks behind. |
+| Queue | One file at a time. After a file is written, its Drive modified time is stored. A restart skips files already stored. Embeddings run 8 chunks at a time, on one ONNX thread. A PDF is read one page at a time. |
 | Embedder | `BAAI/bge-small-en-v1.5`, 384 dims, ONNX. Queries use that model's search prefix. Passages do not. |
 | Keyword | Postgres `tsvector` only. Merge with the vector hits in the app (reciprocal rank fusion). |
 | Drive auth | Scope `drive.readonly`. Share one folder with the service account. No domain-wide delegation. |

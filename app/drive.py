@@ -1,11 +1,12 @@
+import gc
 import io
 import logging
 import os
 import threading
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from app.ingest import ingest_text
-from app.store import connect, delete_absent, get_meta, known_sources, set_meta
+from app.store import connect, delete_absent, set_meta, source_mtimes
 
 log = logging.getLogger("company-brain.drive")
 SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
@@ -44,19 +45,30 @@ def sync_once() -> None:
     folder_id = os.environ["GDRIVE_FOLDER_ID"]
     files = _list_files(service, folder_id)
     with connect() as conn:
-        last = get_meta(conn, "last_success")
-        known = known_sources(conn)
-        threshold = _threshold(last)
-        failed = False
-        for item in files:
-            if not _needs_read(item, known, threshold):
-                continue
-            try:
-                text = _read(service, item)
-                ingest_text(conn, item["id"], item["name"], text)
-            except Exception:
-                failed = True
-                log.exception("Failed to ingest %s", item.get("name"))
+        mtimes = source_mtimes(conn)
+    queue = [item for item in files if _needs_read(item, mtimes)]
+    queue.sort(key=lambda item: (item.get("name") or "", item["id"]))
+    log.info("Drive queue: %s file(s)", len(queue))
+    failed = False
+    for index, item in enumerate(queue, start=1):
+        name = item.get("name") or item["id"]
+        log.info("Drive queue %s/%s %s", index, len(queue), name)
+        text = ""
+        try:
+            text = _read(service, item)
+            with connect() as conn:
+                count = ingest_text(conn, item["id"], name, text)
+                modified = item.get("modifiedTime")
+                if modified:
+                    set_meta(conn, f"mtime:{item['id']}", modified)
+            log.info("Ingested %s (%s chunks)", name, count)
+        except Exception:
+            failed = True
+            log.exception("Failed to ingest %s", name)
+        finally:
+            text = ""
+            gc.collect()
+    with connect() as conn:
         delete_absent(conn, {item["id"] for item in files})
         if not failed:
             set_meta(conn, "last_success", datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
@@ -102,23 +114,21 @@ def _list_files(service, folder_id: str) -> list[dict]:
     return files
 
 
-def _needs_read(item: dict, known: set[str], threshold: datetime | None) -> bool:
+def _needs_read(item: dict, mtimes: dict[str, str]) -> bool:
     if _kind(item) is None:
         return False
     size = int(item.get("size") or 0)
     if size > MAX_BYTES:
         return False
-    if item["id"] not in known or threshold is None:
+    previous = mtimes.get(item["id"])
+    modified = item.get("modifiedTime")
+    if not previous or not modified:
         return True
-    modified = datetime.fromisoformat(item["modifiedTime"].replace("Z", "+00:00"))
-    return modified >= threshold
+    return _parsed_time(modified) > _parsed_time(previous)
 
 
-def _threshold(last: str | None) -> datetime | None:
-    if not last:
-        return None
-    parsed = datetime.fromisoformat(last.replace("Z", "+00:00"))
-    return parsed - timedelta(minutes=5)
+def _parsed_time(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
 def _kind(item: dict) -> str | None:
@@ -151,10 +161,7 @@ def _read(service, item: dict) -> str:
         return _download(service, item["id"], export="text/plain").decode("utf-8", "replace")
     data = _download(service, item["id"])
     if kind == "pdf":
-        from pypdf import PdfReader
-
-        reader = PdfReader(io.BytesIO(data))
-        return "\n".join(page.extract_text() or "" for page in reader.pages)
+        return _pdf_text(data)
     if kind == "docx":
         from docx import Document
 
@@ -164,14 +171,31 @@ def _read(service, item: dict) -> str:
         from openpyxl import load_workbook
 
         book = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
-        lines = []
-        for sheet in book.worksheets:
-            for row in sheet.iter_rows(values_only=True):
-                cells = ["" if cell is None else str(cell) for cell in row]
-                if any(cells):
-                    lines.append(",".join(cells))
-        return "\n".join(lines)
+        try:
+            lines = []
+            for sheet in book.worksheets:
+                for row in sheet.iter_rows(values_only=True):
+                    cells = ["" if cell is None else str(cell) for cell in row]
+                    if any(cells):
+                        lines.append(",".join(cells))
+            return "\n".join(lines)
+        finally:
+            book.close()
     return data.decode("utf-8", "replace")
+
+
+def _pdf_text(data: bytes) -> str:
+    from pypdf import PdfReader
+
+    reader = PdfReader(io.BytesIO(data))
+    page_count = len(reader.pages)
+    del reader
+    parts = []
+    for index in range(page_count):
+        reader = PdfReader(io.BytesIO(data))
+        parts.append(reader.pages[index].extract_text() or "")
+        del reader
+    return "\n".join(parts)
 
 
 def _download(service, file_id: str, export: str | None = None) -> bytes:
