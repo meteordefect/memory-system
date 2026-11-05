@@ -1,6 +1,6 @@
 # Connect Claude
 
-The connector is read-only. It has two tools, `recall` and `reflect`. Loading a document is a separate step, in [load-documents.md](load-documents.md).
+The connector is read-only. It has two tools, `recall` and `reflect`. The sample document is loaded in [load-documents.md](load-documents.md). A Google Drive folder is loaded into the same bank by [connect-drive.md](connect-drive.md). Claude asks the bank.
 
 You need the service URL and the bearer key from the Render Environment page (`HINDSIGHT_API_TENANT_API_KEY`).
 

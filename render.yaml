@@ -1,6 +1,7 @@
 # Company brain for the 5 December 2026 workshop.
-# Deploy this with Render's Blueprint button flow. Do not switch the plan to free:
-# the free instance sleeps and cannot keep a disk.
+# Two services: company-brain holds the bank, company-drive loads a Google
+# Drive folder into it. Deploy with Render's Blueprint button flow.
+# Do not switch either plan to free: the free instance sleeps and cannot keep a disk.
 # https://render.com/docs/blueprint-spec
 
 services:
@@ -69,3 +70,32 @@ services:
         value: deepseek-v4.1-flash
       - key: HINDSIGHT_API_LLM_API_KEY
         sync: false
+
+  # Loads one Google Drive folder into the bank on company-brain.
+  # The free plan sleeps, so a file dropped in Drive would sit there.
+  # Docs → Markdown, Sheets → CSV, Slides → PDF, then the retain API.
+  - type: web
+    name: company-drive
+    runtime: docker
+    dockerfilePath: ./drive.Dockerfile
+    plan: 0.5c-512mb
+    region: singapore
+    healthCheckPath: /api/health
+    autoDeployTrigger: "off"
+    disk:
+      name: drive-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: DB_TYPE
+        value: sqlite
+      - key: DB_DSN
+        value: /data/hindsight-ingestion.db
+      - key: BASIC_AUTH_USERNAME
+        value: admin
+      - key: BASIC_AUTH_PASSWORD
+        generateValue: true
+      - key: CREDENTIAL_ENCRYPTION_KEY
+        generateValue: true
+      - key: TZ
+        value: Asia/Singapore

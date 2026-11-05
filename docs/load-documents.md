@@ -38,9 +38,11 @@ python scripts/retain.py sample/price-list.md path/to/another.md
 python scripts/retain.py path/to/folder
 ```
 
-Keep the originals. They are how you fill the bank again.
+Keep the originals. They are how you fill the bank again from the laptop.
 
 Running the script again with the same text file replaces that document. The id is the filename without the extension.
+
+Documents after this sample come from a Google Drive folder. `company-drive` loads that folder into this same bank. See [connect-drive.md](connect-drive.md).
 
 ## Ask from the terminal
 
