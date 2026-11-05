@@ -45,21 +45,65 @@ In that folder, copy `.env.example` to `.env`. File Explorer or Finder is enough
 
 Put the service URL and the bearer key in `.env`. Leave `RENDER_API_KEY` and `HINDSIGHT_API_LLM_API_KEY` empty. The model key was pasted into Render. It does not go in this file.
 
-## 4. Load a document and ask
+## 4. Load the sample and prove the bank
 
-Follow [docs/load-documents.md](docs/load-documents.md). The sample file is `sample/price-list.md`. The rice line is there so you can check a real figure. A question about a customer's last order is there so you can see an empty answer.
+On a Mac the command is `python3`. On Windows it is `python`, or `py -3` if `python` is missing. Run these from the unzipped folder. Details are in [docs/load-documents.md](docs/load-documents.md).
 
-## 5. Connect Claude
+```bash
+python3 scripts/check.py
+python3 scripts/retain.py sample/price-list.md
+python3 scripts/ask.py "What is the price of the 20 kg jasmine rice?"
+```
 
-Follow [docs/connect-claude.md](docs/connect-claude.md).
+`check.py` should report the service healthy and `recall without a key: 401`. The rice answer should be SGD 42.00 per pack, SKU NL-RICE-20, minimum 4 packs, from `price-list.md`.
 
-The URL Claude needs is:
+## 5. Tell the brain what it is for
+
+Show this. Do not ship one sentence for every company. The variable name is always `HINDSIGHT_API_MCP_INSTRUCTIONS`. The words after the equals sign are that company's.
+
+On the service, Environment, add the variable and save. Saving restarts the service. Wait until it says Live again. One example, for the sample price list:
+
+```
+HINDSIGHT_API_MCP_INSTRUCTIONS=This bank holds the company's documents. A short phrase such as a product name is a search of this bank. If recall returns nothing, say the documents do not say.
+```
+
+This line is attached to the `recall` tool. It does not make Claude choose the brain. The project instruction in the next step does that, and that paragraph changes per company too.
+
+## 6. Connect Claude
+
+Follow [docs/connect-claude.md](docs/connect-claude.md). The URL is:
 
 ```
 https://<your-service>.onrender.com/mcp/company/
 ```
 
-The header value is `Bearer <the key>`, including the word `Bearer` and the space.
+In the connector dialog:
+
+1. Name it `brain`.
+2. Paste that URL.
+3. Choose **No sign-in**. Ignore **Sign in now** even when it says Detected. This server has no sign-in page.
+4. Leave the OAuth client section alone.
+5. Add a request header. Name: `Authorization`. Value: `Bearer`, one space, then `HINDSIGHT_API_TENANT_API_KEY`.
+
+ChatGPT has nowhere to put this key. Leave the lock on. The client is Claude.
+
+## 7. Tell Claude to use the brain
+
+Create a Claude project named `Company brain`. Paste this into the project instructions:
+
+```
+On every message about this company, call the brain first. Use recall for a fact, a price, a policy, or what a document says. Use reflect when the question asks for a judgement, a recommendation, or a comparison across those facts. Do not call both for the same question. Skip the brain only when the message is clearly not about this company, such as general knowledge, coding help, or a personal question. A short or vague line is still a company question. "Bolt pricing" means recall the bolt price. If the brain has the fact, answer from the brain and do not search the web. If it returns nothing, say the documents do not say, then ask whether to search the web. Do not search the web unless the user says yes. Do not suggest or connect Xero, Salesforce, or any other app.
+```
+
+## 8. Ask, in a new chat
+
+Open a new chat in that project. Turn `brain` on. Turn web search off if the chat shows that switch. A reply with no `recall` or `reflect` step did not use the brain. Ask one at a time:
+
+1. `jasmine pricing` — `recall`. SGD 42.00 per pack. No web search.
+2. `bolt pricing` — `recall`. The documents do not say. It may ask to search the web. It must not search until you say yes.
+3. `A customer wants 2 packs of jasmine rice. Should we accept the order?` — `reflect`. No. The minimum is 4 packs. This one is slower. A line about loading a schema is the tool starting, not an error.
+4. `What is our growth forecast this quarter?` — the documents do not say, then it asks before any web search. It does not offer Xero or Salesforce.
+5. `What did Acme last order?` — the documents do not say. It does not invent an order.
 
 ## Leave it running
 
@@ -103,6 +147,8 @@ Open the deploy logs and match the line.
 Render probes `/health/live`, which only checks that the process is up. `/health` also checks the database. `python scripts/check.py` calls it. Everything under `/v1/` and `/mcp/` requires the bearer key.
 
 ## For the teacher
+
+Run the room from the numbered steps above. Step 5 is a demonstration: each company writes its own sentence. The 5 Nov rehearsal passed on `https://company-brain-t8mt.onrender.com`: the sample file loaded, `jasmine pricing` used `recall`, and the 2-pack order used `reflect` and refused the order. ChatGPT cannot hold this bearer key. Google Drive is a separate morning show and is not one of these steps.
 
 Students never commit. This folder is published once, as a public repository, with `render.yaml` at the root. The link to send is:
 
