@@ -55,14 +55,15 @@ Served at `/mcp`.
 
 | Tool | What it does |
 | --- | --- |
-| `search` | Top chunks for a query, with filename and score. Default 5 |
-| `list_sources` | What is indexed, how many chunks, when the last sync ran |
+| `search` | Top chunks for a query, with filename, chunk id, and score. Default 5. Skips soft-deleted and heavily demoted chunks |
+| `list_sources` | What is indexed, how many live chunks, when the last sync ran |
+| `feedback` | Mark a returned chunk `useful`, `wrong`, or `outdated`. Does not edit Drive |
 
 Ingest is not a tool. The sync pulls the Drive folder. The model cannot send the server a URL to fetch.
 
 ## What a sync does
 
-Every 15 minutes the service lists every file in the folder and its subfolders. New and changed files go on a queue and are taken one at a time, so a first sync of many files does not load them together. Google Docs, Sheets, and Slides are exported to text. PDF, Word, Excel, Markdown, and plain text are read as files. A PDF is read one page at a time. Each file is chunked at about 512 tokens with 64 overlap. The model embeds 8 chunks at a time, the file is saved, and the next file starts. A restart skips files already saved and continues the rest. A file that left the folder loses its rows when that pass finishes.
+Every 15 minutes the service lists every file in the folder and its subfolders. New and changed files go on a queue and are taken one at a time, so a first sync of many files does not load them together. Google Docs, Sheets, and Slides are exported to text. PDF, Word, Excel, Markdown, and plain text are read as files. A PDF is read one page at a time. Each file is chunked at about 512 tokens with 64 overlap. The model embeds 8 chunks at a time, the file is saved, and the next file starts. A restart skips files already saved and continues the rest. A file that left the folder is soft-deleted when that pass finishes, and search stops returning it. A chunk marked wrong or outdated twice drops out of default search. Marking it useful brings it back.
 
 The Drive folder is shared with a Google Cloud service account. The account is read-only. On Render the key is `GDRIVE_SERVICE_ACCOUNT_JSON` and the folder id is `GDRIVE_FOLDER_ID`.
 
@@ -178,7 +179,7 @@ These files are indexed, including files in subfolders:
 - Excel `.xlsx`
 - Markdown and plain text
 
-Pictures, `.doc`, `.xls`, and anything else are skipped. A file over 20 MB is skipped. Removing a file from the folder removes it from the index on the next sync.
+Pictures, `.doc`, `.xls`, and anything else are skipped. A file over 20 MB is skipped. Removing a file from the folder hides it from search on the next sync.
 
 If Claude still shows only the price list, open the folder's Share dialog and check that the `client_email` is listed as Viewer. Then use **Save and deploy** again, or wait for the next 15-minute check.
 

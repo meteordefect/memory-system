@@ -19,6 +19,7 @@ ENV FASTEMBED_CACHE_PATH=/opt/models
 RUN python -c "from fastembed import TextEmbedding; TextEmbedding(model_name='BAAI/bge-small-en-v1.5')"
 
 COPY app /app/app
+COPY migrations /app/migrations
 COPY sample/price-list.md /app/sample/price-list.md
 COPY render-start.sh /render-start.sh
 RUN chmod 755 /render-start.sh
