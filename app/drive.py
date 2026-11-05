@@ -11,7 +11,7 @@ from app.store import connect, delete_absent, set_meta, source_mtimes
 log = logging.getLogger("company-brain.drive")
 SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 MAX_BYTES = 20_000_000
-INTERVAL_SECONDS = 15 * 60
+INTERVAL_SECONDS = 2 * 60
 
 
 def configured() -> bool:

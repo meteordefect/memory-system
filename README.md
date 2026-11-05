@@ -22,10 +22,10 @@ flowchart LR
   end
 
   Claude -->|"HTTPS and bearer"| MCP
-  Drive -->|"read-only, every 15 min"| MCP
+  Drive -->|"read-only, every 2 min"| MCP
 ```
 
-Claude sends a question to `https://company-brain-xxxx.onrender.com/mcp` with a bearer key. Render assigns the `xxxx` once, when that company deploys, so each service has its own host. The host stays the same on later deploys. The service embeds the question, searches the chunks, and returns the best ones. Every 15 minutes the same process reads the Drive folder and replaces the chunks for files that changed. ChatGPT uses this URL only after OAuth exists. Until then, Claude is the client.
+Claude sends a question to `https://company-brain-xxxx.onrender.com/mcp` with a bearer key. Render assigns the `xxxx` once, when that company deploys, so each service has its own host. The host stays the same on later deploys. The service embeds the question, searches the chunks, and returns the best ones. Every 2 minutes the same process reads the Drive folder and replaces the chunks for files that changed. ChatGPT uses this URL only after OAuth exists. Until then, Claude is the client.
 
 ## Status
 
@@ -43,7 +43,7 @@ Staff sign-in by company email is WorkOS, and it is not part of this deploy. Tod
 | Storage | Postgres 16 + pgvector, in the web container, on a 10 GB disk |
 | Embedder | BGE-small, 384 dimensions, ONNX. Same model, smaller runtime than PyTorch |
 | Keyword search | Postgres `tsvector`, merged with the vector results |
-| Ingestion | Drive sync every 15 minutes, inside the web process |
+| Ingestion | Drive sync every 2 minutes, inside the web process |
 | TLS | Render, on `*.onrender.com` |
 | Deploy | One image. On Render, `render.yaml` plus a 10 GB disk |
 
@@ -63,7 +63,7 @@ Ingest is not a tool. The sync pulls the Drive folder. The model cannot send the
 
 ## What a sync does
 
-Every 15 minutes the service lists every file in the folder and its subfolders. New and changed files go on a queue and are taken one at a time, so a first sync of many files does not load them together. Google Docs, Sheets, and Slides are exported to text. PDF, Word, Excel, Markdown, and plain text are read as files. A PDF is read one page at a time. Each file is chunked at about 512 tokens with 64 overlap. The model embeds 8 chunks at a time, the file is saved, and the next file starts. A restart skips files already saved and continues the rest. A file that left the folder is soft-deleted when that pass finishes, and search stops returning it. A chunk marked wrong or outdated twice drops out of default search. Marking it useful brings it back.
+Every 2 minutes the service lists every file in the folder and its subfolders. New and changed files go on a queue and are taken one at a time, so a first sync of many files does not load them together. Google Docs, Sheets, and Slides are exported to text. PDF, Word, Excel, Markdown, and plain text are read as files. A PDF is read one page at a time. Each file is chunked at about 512 tokens with 64 overlap. The model embeds 8 chunks at a time, the file is saved, and the next file starts. A restart skips files already saved and continues the rest. A file that left the folder is soft-deleted when that pass finishes, and search stops returning it. A chunk marked wrong or outdated twice drops out of default search. Marking it useful brings it back.
 
 The Drive folder is shared with a Google Cloud service account. The account is read-only. On Render the key is `GDRIVE_SERVICE_ACCOUNT_JSON` and the folder id is `GDRIVE_FOLDER_ID`.
 
@@ -169,7 +169,7 @@ The header is still `Authorization`, and the value is `Bearer` plus the `MCP_API
 
 Ask Claude: "What sources are indexed?"
 
-The files in `sample/` are there from the first boot, and a later boot adds any sample file that is not stored yet. Drive files appear beside them after a sync. The first sync runs when the new deploy goes live. After that, the service checks the folder every 15 minutes, so a file added just after a sync can take that long to show up.
+The files in `sample/` are there from the first boot, and a later boot adds any sample file that is not stored yet. Drive files appear beside them after a sync. The first sync runs when the new deploy goes live. After that, the service checks the folder every 2 minutes, so a file added just after a sync can take that long to show up.
 
 These files are indexed, including files in subfolders:
 

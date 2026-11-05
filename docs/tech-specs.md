@@ -18,7 +18,7 @@ flowchart LR
   end
 
   Claude -->|"HTTPS and bearer"| MCP
-  Drive -->|"list every 15 min"| Q
+  Drive -->|"list every 2 min"| Q
 ```
 
 ```mermaid
@@ -49,7 +49,7 @@ That is the usual queue for one process. A broker such as Redis, Celery, RQ, or 
 
 | Knob | Value | Where |
 | --- | --- | --- |
-| Folder check | every 15 minutes | `INTERVAL_SECONDS` in `app/drive.py` |
+| Folder check | every 2 minutes | `INTERVAL_SECONDS` in `app/drive.py` |
 | File queue | one file, then the next | `sync_once` in `app/drive.py` |
 | Finished file | `mtime:<file id>` = Drive `modifiedTime` | `meta`, written in `sync_once` |
 | Retry | a failed file has no `mtime` row | `sync_once` |

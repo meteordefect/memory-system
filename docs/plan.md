@@ -1,6 +1,6 @@
 # Build Plan: Company Brain
 
-One Render blueprint. One web service. Three MCP tools. Fifteen-minute freshness.
+One Render blueprint. One web service. Three MCP tools. Two-minute freshness.
 
 The brain indexes one shared Google Drive folder and exposes that index over MCP. Claude connects to the Render HTTPS URL and searches it. The model the person already pays for writes the answer. This server searches and lists. It does not write answers, and it does not fetch URLs the model sends.
 
@@ -18,7 +18,7 @@ flowchart LR
   end
 
   Claude -->|"HTTPS and bearer"| MCP
-  Drive -->|"read-only, every 15 min"| MCP
+  Drive -->|"read-only, every 2 min"| MCP
 ```
 
 ## Will this work
@@ -31,7 +31,7 @@ Yes, for the job it is: Claude searches documents from one Drive folder, on the 
 | Postgres 16 + pgvector, in the web container, on a 10 GB disk | Same kind of disk as the workshop. The app runs `CREATE EXTENSION vector` on startup. Postgres listens on localhost. |
 | BGE-small, 384 dimensions | The right small local model. Run it through ONNX (`fastembed`), with the model baked into the image. PyTorch on the 2 GB plan is the thing that gets the process killed. The vectors stay 384. |
 | Hybrid search | `tsvector` and cosine distance, merged in the app. A company folder is small, so cosine search is exact. An ivfflat index is for a much larger table. |
-| Drive ingest every 15 minutes | Works while the paid instance stays up. The free plan sleeps, so the blueprint stays on `1c-2g`. |
+| Drive ingest every 2 minutes | Works while the paid instance stays up. The free plan sleeps, so the blueprint stays on `1c-2g`. |
 | ChatGPT on the same URL | Later. ChatGPT's custom MCP takes OAuth or no authentication. It has nowhere to put the bearer key. Opening the URL to get ChatGPT working would publish the folder. |
 
 ## Decisions
@@ -61,7 +61,7 @@ A document can still tell the chat model to ignore its instructions. The server 
 | Storage | Postgres 16 + pgvector, on a 10 GB disk | Room to grow. $2.50 a month at $0.25/GB |
 | Embedder | BGE-small via ONNX (`fastembed`) | Local, 384 dims, fits the 2 GB plan |
 | Keyword search | Postgres `tsvector` | Hybrid retrieval without loading the corpus into the process |
-| Ingestion | Sync function, every 15 min, inside the web process | Drive → extract → chunk → embed → replace |
+| Ingestion | Sync function, every 2 min, inside the web process | Drive → extract → chunk → embed → replace |
 | TLS | Render's HTTPS on `*.onrender.com` | The URL Claude connects to |
 | Deploy | One image. `render.yaml` is the Render host file | The same image runs on a later host with a volume and HTTPS |
 
@@ -81,7 +81,7 @@ Exposed at `/mcp`, stateless Streamable HTTP. Every request must carry `Authoriz
 
 ## Ingestion
 
-`sync_gdrive.py`, every 15 minutes, from a background task in the web process.
+`sync_gdrive.py`, every 2 minutes, from a background task in the web process.
 
 1. List every file in `FOLDER_ID` and its subfolders. Paginate. Set `supportsAllDrives` and `includeItemsFromAllDrives` so a Shared Drive folder works. Skip trashed files.
 2. Read `last_success` from `meta`.
