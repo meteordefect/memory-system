@@ -1,0 +1,71 @@
+# Company brain for the 5 December 2026 workshop.
+# Deploy this with Render's Blueprint button flow. Do not switch the plan to free:
+# the free instance sleeps and cannot keep a disk.
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: company-brain
+    runtime: docker
+    plan: 1c-2g
+    region: singapore
+    # Liveness only. A slow database must not make Render kill the process.
+    healthCheckPath: /health/live
+    # A later git push must not restart the database under the class.
+    autoDeployTrigger: "off"
+    disk:
+      name: hindsight-pg0
+      mountPath: /home/hindsight/.pg0
+      sizeGB: 1
+    envVars:
+      # Render forwards the public URL to this port. The admin UI stays off,
+      # so 9999 is never the public port.
+      - key: PORT
+        value: "8888"
+      - key: HINDSIGHT_API_HOST
+        value: 0.0.0.0
+      - key: HINDSIGHT_API_PORT
+        value: "8888"
+      - key: HINDSIGHT_ENABLE_CP
+        value: "false"
+      - key: HINDSIGHT_API_WORKER_ID
+        value: company-brain
+      # One process, and a low cap on parallel work. The 2 GB plan
+      # OOMs if the models and several requests run at once.
+      - key: HINDSIGHT_API_WORKERS
+        value: "1"
+      - key: HINDSIGHT_API_LLM_MAX_CONCURRENT
+        value: "2"
+      - key: HINDSIGHT_API_RECALL_MAX_CONCURRENT
+        value: "2"
+      - key: HINDSIGHT_API_EMBEDDINGS_LOCAL_FORCE_CPU
+        value: "true"
+      - key: HINDSIGHT_API_RERANKER_LOCAL_FORCE_CPU
+        value: "true"
+      - key: HINDSIGHT_API_RERANKER_LOCAL_MAX_CONCURRENT
+        value: "1"
+
+      # One shared bearer key. Render generates it. Copy it into Claude.
+      # Do not add HINDSIGHT_API_TENANT_MCP_AUTH_DISABLED.
+      - key: HINDSIGHT_API_TENANT_EXTENSION
+        value: "hindsight_api.extensions.builtin.tenant:ApiKeyTenantExtension"
+      - key: HINDSIGHT_API_TENANT_API_KEY
+        generateValue: true
+
+      # Claude can read. Loading documents uses the HTTP API, not these tools.
+      - key: HINDSIGHT_API_MCP_ENABLED
+        value: "true"
+      - key: HINDSIGHT_API_MCP_ENABLED_TOOLS
+        value: recall,reflect
+
+      # OpenCode Go is filled in. Claude Team: change these three before
+      # the first deploy. See docs/model-keys.md.
+      # Re-read OpenCode Go's DeepSeek retention footnote after 30 Nov 2026.
+      - key: HINDSIGHT_API_LLM_PROVIDER
+        value: openai
+      - key: HINDSIGHT_API_LLM_BASE_URL
+        value: https://opencode.ai/inference/go/openai/v1
+      - key: HINDSIGHT_API_LLM_MODEL
+        value: deepseek-v4.1-flash
+      - key: HINDSIGHT_API_LLM_API_KEY
+        sync: false
