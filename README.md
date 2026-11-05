@@ -29,9 +29,11 @@ Claude sends a question to `https://<service>.onrender.com/mcp` with a bearer ke
 
 ## Status
 
-The container is in this branch. Render builds it, because the image is too large for this machine. The spec is [docs/plan.md](docs/plan.md). The first proof is `search` against the sample price list on the Render URL. Drive sync stays off until a folder id and a service account are set.
+Claude search is proven on `https://company-brain-4f8c.onrender.com/mcp` with the bearer key. The sample price list is in the index. Drive sync is in the same image and stays off until the two Drive values below are set on the service.
 
-`main` and `hindsight` still hold the earlier Hindsight workshop. This branch is the new build. The `render.yaml` in the tree is still that workshop's blueprint.
+Staff sign-in by company email is WorkOS, and it is not part of this deploy. Today everyone who has the bearer key can search.
+
+`main` and `hindsight` still hold the earlier Hindsight workshop. This branch is the new build. `render.yaml` is this app's Blueprint.
 
 ## Stack
 
@@ -64,6 +66,18 @@ Every 15 minutes the service lists every file in the folder and its subfolders. 
 
 The Drive folder is shared with a Google Cloud service account. The account is read-only. On Render the key is `GDRIVE_SERVICE_ACCOUNT_JSON` and the folder id is `GDRIVE_FOLDER_ID`.
 
+## Connect the folder
+
+Do this once per company. The people in Claude do not each get a Google key.
+
+1. In Google Cloud, enable the Google Drive API. Create a service account and download its JSON key.
+2. Share the company folder with that service account's email as a viewer.
+3. Copy the folder id from the folder URL, the part after `/folders/`.
+4. On the Render service, set `GDRIVE_FOLDER_ID` and paste the JSON into `GDRIVE_SERVICE_ACCOUNT_JSON`. Save. The service restarts, syncs that folder, then repeats every 15 minutes.
+5. In Claude, ask what sources are indexed. The sample price list remains until you remove it.
+
+No Drive key is stored in this repo. The running test still answers from the sample file.
+
 ## Security
 
 Render generates `MCP_API_KEY`. Claude sends it as `Authorization: Bearer <key>`, the same header the last workshop used. Anyone with that key can search the whole folder. The service does not copy each person's own Drive permissions.
@@ -77,9 +91,7 @@ The web service is $25 a month. The 10 GB disk is $2.50 a month. Drive remains t
 ```
 render.yaml           the Blueprint the deploy link reads
 Dockerfile            image, with BGE-small baked in
-app/                  FastAPI + FastMCP tools
-sync_gdrive.py        15-minute Drive sync
-docker-compose.yml    local test only
+app/                  MCP tools and the Drive sync
 ```
 
 Schema, the Blueprint, and the Claude steps are in [docs/plan.md](docs/plan.md).
