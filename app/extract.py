@@ -104,7 +104,12 @@ def _post(base: str, key: str, payload: dict) -> str | None:
     request = urllib.request.Request(
         f"{base}/chat/completions",
         data=json.dumps(payload).encode(),
-        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+        headers={
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "User-Agent": "company-brain/1.0",
+            "x-opencode-session": "company-brain-extraction",
+        },
         method="POST",
     )
     try:

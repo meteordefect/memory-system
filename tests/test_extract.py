@@ -61,6 +61,8 @@ def test_json_mode_refusal_retries_without_it(monkeypatch):
     def fake_open(request, timeout=0):
         calls.append(json.loads(request.data.decode()))
         assert request.get_header("Authorization") == "Bearer test-key"
+        assert request.get_header("User-agent") == "company-brain/1.0"
+        assert request.get_header("X-opencode-session") == "company-brain-extraction"
         if len(calls) == 1:
             raise urllib.error.HTTPError(
                 request.full_url,
