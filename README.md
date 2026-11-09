@@ -29,7 +29,7 @@ Claude sends a question to `https://company-brain-xxxx.onrender.com/mcp` with a 
 
 ## Status
 
-Claude search is proven on a test service at `https://company-brain-4f8c.onrender.com/mcp` with the bearer key. The sample files in `sample/` are loaded into the index on boot when that file is not already stored: the price list, the bolt price, the 2024 rice price, and the Friday lunch rule. Drive sync runs after `GDRIVE_FOLDER_ID` and `GDRIVE_SERVICE_ACCOUNT_JSON` are set and that folder is shared with the service account. The test service has both values. Files show up once the share is in place.
+Claude search is proven on a test service at `https://company-brain-4f8c.onrender.com/mcp` with the bearer key. The sample files in `sample/` are loaded into the index on boot when that file is not already stored: the price list, the bolt price, the 2024 rice price, the Friday lunch rule, and the demo emails and invoices in `sample/demo/`. Drive sync runs after `GDRIVE_FOLDER_ID` and `GDRIVE_SERVICE_ACCOUNT_JSON` are set and that folder is shared with the service account. The test service has both values. Files show up once the share is in place.
 
 Staff sign-in by company email is WorkOS, and it is not part of this deploy. Today everyone who has the bearer key can search.
 
@@ -55,7 +55,7 @@ Served at `/mcp`.
 
 | Tool | What it does |
 | --- | --- |
-| `search` | Top chunks for a query, with filename, chunk id, and score. Default 5. Skips soft-deleted and heavily demoted chunks |
+| `search` | Top chunks for a query, with filename, chunk id, and score. Default 5. May add up to 3 connected chunks. Skips soft-deleted and heavily demoted chunks |
 | `list_sources` | What is indexed, how many live chunks, when the last sync ran |
 | `feedback` | Mark a returned chunk `useful`, `wrong`, or `outdated`. Does not edit Drive |
 
@@ -63,9 +63,25 @@ Ingest is not a tool. The sync pulls the Drive folder. The model cannot send the
 
 ## What a sync does
 
-Every 2 minutes the service lists every file in the folder and its subfolders. New and changed files go on a queue and are taken one at a time, so a first sync of many files does not load them together. Google Docs, Sheets, and Slides are exported to text. PDF, Word, Excel, Markdown, and plain text are read as files. A PDF is read one page at a time. Each file is chunked at about 512 tokens with 64 overlap. The model embeds 8 chunks at a time, the file is saved, and the next file starts. A restart skips files already saved and continues the rest. A file that left the folder is soft-deleted when that pass finishes, and search stops returning it. A chunk marked wrong or outdated twice drops out of default search. Marking it useful brings it back.
+Every 2 minutes the service lists every file in the folder and its subfolders. New and changed files go on a queue and are taken one at a time, so a first sync of many files does not load them together. Google Docs, Sheets, and Slides are exported to text. PDF, Word, Excel, Markdown, and plain text are read as files. A PDF is read one page at a time. Each file is chunked at about 512 tokens with 64 overlap. The model embeds 8 chunks at a time, the file is saved, and the next file starts. A restart skips files already saved and continues the rest. A file that left the folder is soft-deleted when that pass finishes, and search stops returning it. A chunk marked wrong or outdated twice drops out of default search. Marking it useful brings it back. When `EXTRACTION_API_KEY` is set, that same save also writes the people, companies, and products named in the file, and the links `ontology.yaml` allows.
 
 The Drive folder is shared with a Google Cloud service account. The account is read-only. On Render the key is `GDRIVE_SERVICE_ACCOUNT_JSON` and the folder id is `GDRIVE_FOLDER_ID`.
+
+## The graph
+
+Search still returns the closest chunks. `ontology.yaml` is the file students edit. It lists the entity types and the relationships that are allowed. Person, Company, and Product are the starter set, with the sample company filled in as aliases.
+
+When `EXTRACTION_API_KEY` is set, each saved file is read once for those names and links. The rows sit in the same Postgres database and point back at the chunk. A later question can bring back another chunk that shares a name, or a chunk one or two links away. That extra passage has a Connected line. The line is data.
+
+Edit `ontology.yaml`, then redeploy. The service reads the chunks already stored and writes the links again. The embeddings stay. Leave the key empty and this step is skipped, so search is unchanged. Leave `relationships` empty and the names are still stored. Two spellings become one row only when both are in the alias list. The model copies the name written in the file. A name in the alias list is also stored when the file contains it, once the key is set. A failed model call is retried, and those names are still written.
+
+| Key | Value |
+| --- | --- |
+| `EXTRACTION_API_KEY` | The model key. Empty means no graph. |
+| `EXTRACTION_BASE_URL` | The blueprint sets OpenCode Go. Replace it for another OpenAI-compatible endpoint. When this variable is unset, the code uses `https://api.openai.com/v1`. |
+| `EXTRACTION_MODEL` | The blueprint sets `deepseek-v4.1-flash`. When this variable is unset, the code uses `gpt-4o-mini`. |
+
+The file text is sent to that model once, when the file is indexed. The first 20,000 characters are sent. The question is not sent there.
 
 ## Connect the folder
 

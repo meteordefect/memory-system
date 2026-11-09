@@ -21,6 +21,7 @@ RUN python -c "from fastembed import TextEmbedding; TextEmbedding(model_name='BA
 COPY app /app/app
 COPY migrations /app/migrations
 COPY sample /app/sample
+COPY ontology.yaml /app/ontology.yaml
 COPY render-start.sh /render-start.sh
 RUN chmod 755 /render-start.sh
 

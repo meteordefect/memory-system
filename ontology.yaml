@@ -1,0 +1,67 @@
+# Types the brain may extract. Edit this file, redeploy, and the service
+# rebuilds the links from the chunks it already stored. It does not embed again.
+#
+# Leave relationships empty and the names are still stored.
+# Leave EXTRACTION_API_KEY empty and search stays as it is.
+# The alias list is how two spellings of one thing become one row.
+# A name in that list is stored when it is written in a file.
+# The model copies the name it sees. It does not decide that on its own.
+# A hint is sent with the extraction. It is not stored as a fact.
+
+entities:
+  - name: Person
+    hint: A named individual, including the sender or the sign-off of an email.
+  - name: Company
+    hint: A business, account, or trading name.
+  - name: Product
+    hint: A product, pack, or SKU.
+
+relationships:
+  - from: Person
+    type: works_at
+    to: Company
+    hint: A person at that company, including the sign-off of an email.
+  - from: Company
+    type: customer_of
+    to: Company
+    hint: The first company is billed by the second.
+  - from: Product
+    type: superseded_by
+    to: Product
+    hint: An older price of this product is replaced by the current one.
+
+aliases:
+  - type: Person
+    name: Arun Shah
+    also:
+      - Arun
+  - type: Person
+    name: Mei Tan
+    also:
+      - Mei
+  - type: Company
+    name: Kedron Street Kitchen
+    also:
+      - Kedron
+      - KSK-19
+  - type: Company
+    name: Harbour Pantry
+    also:
+      - Harbour Pantry Pte. Ltd.
+      - HP-220
+  - type: Company
+    name: Northline Wholesale
+    also:
+      - Northline
+  - type: Product
+    name: Jasmine rice
+    also:
+      - NL-RICE-20
+  - type: Product
+    name: Light soy sauce
+    also:
+      - NL-SOY-1
+  - type: Product
+    name: Carriage bolts
+    also:
+      - NL-BOLT-50

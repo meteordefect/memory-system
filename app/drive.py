@@ -5,7 +5,9 @@ import os
 import threading
 from datetime import datetime, timezone
 
+from app.graph import drop_absent, refresh_stale
 from app.ingest import ingest_text
+from app.ontology import load_or_empty
 from app.store import connect, delete_absent, set_meta, source_mtimes
 
 log = logging.getLogger("company-brain.drive")
@@ -68,10 +70,19 @@ def sync_once() -> None:
         finally:
             text = ""
             gc.collect()
+    keep_ids = {item["id"] for item in files}
     with connect() as conn:
-        delete_absent(conn, {item["id"] for item in files})
+        delete_absent(conn, keep_ids)
+        drop_absent(conn, keep_ids)
         if not failed:
             set_meta(conn, "last_success", datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
+    try:
+        with connect() as conn:
+            count = refresh_stale(conn, load_or_empty())
+        if count:
+            log.info("Graph updated %s file(s)", count)
+    except Exception:
+        log.exception("Graph refresh failed")
 
 
 def _account_info() -> dict:

@@ -270,7 +270,7 @@ ChatGPT Business can use this URL once the server speaks OAuth. That is a later 
 | Salesforce (live queries) | A second MCP server in the client config |
 | Salesforce (indexed) | `sync_salesforce.py`, same replace path as Drive |
 | Confluence / Notion / Jira | One script per source, same replace path |
-| Higher precision | LLM fact extraction at ingest, per chunk |
+| Connected facts | `ontology.yaml`, then entities and links in Postgres during ingest when `EXTRACTION_API_KEY` is set |
 | Temporal queries | A date column, filtered in `search` |
 | A much larger corpus | An HNSW index on `embedding` |
 | More sources | `connectors/` folder, one file per source |

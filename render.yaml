@@ -22,3 +22,9 @@ services:
         sync: false
       - key: GDRIVE_SERVICE_ACCOUNT_JSON
         sync: false
+      - key: EXTRACTION_API_KEY
+        sync: false
+      - key: EXTRACTION_BASE_URL
+        value: https://opencode.ai/inference/go/openai/v1
+      - key: EXTRACTION_MODEL
+        value: deepseek-v4.1-flash

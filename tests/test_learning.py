@@ -1,6 +1,3 @@
-import os
-
-import psycopg
 import pytest
 
 from app.search import format_hits, search
@@ -46,6 +43,34 @@ def test_search_bumps_only_returned_chunks(monkeypatch):
     assert format_hits(hits).startswith("Chunk: 3\nSource: a.md\nrice")
 
 
+def test_search_appends_a_connected_chunk(monkeypatch):
+    shown = {}
+    _patch_search(monkeypatch, [_hit(3, 0, "unopened soy")], shown)
+    extra = _hit(9, 0, "returned within 7 days")
+    extra["source_name"] = "price-list.md"
+    extra["path"] = "Product: Light soy sauce"
+    monkeypatch.setattr("app.search.connected_hits", lambda conn, query, ontology, hits: [extra])
+    hits = search(None, "who asked to return the soy", top_k=1)
+    assert [hit["id"] for hit in hits] == [3, 9]
+    assert shown["ids"] == [3, 9]
+    text = format_hits(hits)
+    assert "Connected: Product: Light soy sauce" in text
+    assert text.startswith("Chunk: 3\nSource: a.md\nunopened soy")
+
+
+def test_search_still_returns_chunks_when_the_graph_fails(monkeypatch):
+    shown = {}
+    _patch_search(monkeypatch, [_hit(3, 0, "rice")], shown)
+
+    def boom(conn, query, ontology, hits):
+        raise RuntimeError("graph down")
+
+    monkeypatch.setattr("app.search.connected_hits", boom)
+    hits = search(None, "rice", top_k=1)
+    assert [hit["id"] for hit in hits] == [3]
+    assert shown["ids"] == [3]
+
+
 def test_empty_search_marks_nothing(monkeypatch):
     shown = {}
     _patch_search(monkeypatch, [], shown)
@@ -61,8 +86,9 @@ def test_bearer_guard_still_fails_closed():
 
 
 def test_existing_bank_keeps_rows_through_migration(conn):
-    conn.execute("DROP TABLE IF EXISTS chunk_feedback")
-    conn.execute("DROP TABLE IF EXISTS facts")
+    for name in ("links", "entity_sources", "entities", "chunk_feedback", "facts"):
+        conn.execute(f"DROP TABLE IF EXISTS {name}")
+    conn.commit()
     conn.execute(
         """
         CREATE TABLE facts (
@@ -138,6 +164,7 @@ def test_migration_is_idempotent(conn):
         """
     ).fetchall()
     assert uniques == []
+    assert conn.execute("SELECT to_regclass('public.entities')").fetchone()[0] == "entities"
 
 
 def test_replace_and_absent_files_are_soft_deleted(conn):
@@ -251,18 +278,6 @@ def test_stale_and_demoted_chunks_sink(conn):
     assert [hit["source_id"] for hit in vector_hits(conn, embedding, 5)] == ["fresh", "weak", "stale"]
 
 
-@pytest.fixture()
-def conn():
-    url = os.environ.get("TEST_DATABASE_URL", "").strip()
-    if not url:
-        pytest.skip("TEST_DATABASE_URL is not set")
-    with psycopg.connect(url) as connection:
-        init_schema(connection)
-        connection.execute("TRUNCATE facts, chunk_feedback RESTART IDENTITY CASCADE")
-        connection.commit()
-        yield connection
-
-
 def _embedding() -> list[float]:
     values = [0.0] * 384
     values[0] = 1.0
@@ -284,4 +299,5 @@ def _patch_search(monkeypatch, vector, shown) -> None:
     monkeypatch.setattr("app.search.embed_query", lambda query: [0.0])
     monkeypatch.setattr("app.search.vector_hits", lambda conn, embedding, limit: vector)
     monkeypatch.setattr("app.search.keyword_hits", lambda conn, query, limit: [])
+    monkeypatch.setattr("app.search.connected_hits", lambda conn, query, ontology, hits: [])
     monkeypatch.setattr("app.search.mark_shown", lambda conn, ids: shown.setdefault("ids", list(ids)))

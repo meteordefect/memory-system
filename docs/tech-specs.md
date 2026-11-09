@@ -61,6 +61,10 @@ That is the usual queue for one process. A broker such as Redis, Celery, RQ, or 
 | PDF read | one page, then the reader is dropped | `_pdf_text` in `app/drive.py` |
 | PDF fonts | `fonttools` so embedded fonts decode | `requirements.txt` |
 | File cap | 20 MB, larger files are skipped | `MAX_BYTES` in `app/drive.py` |
+| Ontology | entity types, relationships, aliases | `ontology.yaml` |
+| Extraction | one model call per file, first 20,000 characters. Skipped when the key is unset | `EXTRACTION_API_KEY`, `app/extract.py` |
+| Graph rebuild | a changed ontology rebuilds links from stored chunks. Embeddings stay | `refresh_stale` in `app/graph.py` |
+| Graph walk | at most 2 hops, at most 3 extra chunks | `MAX_DEPTH`, `EXTRA_CHUNKS` in `app/graph.py` |
 | Replace | one transaction per file: soft-delete live chunks, then insert | `replace_source` in `app/store.py` |
 | Search | default 5 chunks, cap 20, pool 20 | `search` in `app/search.py` |
 | Merge | reciprocal rank fusion, k = 60 | `rrf` in `app/text.py` |
