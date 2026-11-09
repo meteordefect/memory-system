@@ -20,8 +20,7 @@ def start_refresh() -> None:
 
 
 def refresh_source(conn, ontology: Ontology, source_id: str, text: str | None = None) -> bool:
-    with _lock:
-        return _refresh_source(conn, ontology, source_id, text)
+    return _refresh_source(conn, ontology, source_id, text)
 
 
 def refresh_stale(conn, ontology: Ontology) -> int:
@@ -36,6 +35,7 @@ def refresh_stale(conn, ontology: Ontology) -> int:
         """
     ).fetchall()
     conn.commit()
+    conn.execute("SET statement_timeout = '20s'")
     source_ids = sorted(
         (row[0] for row in rows),
         key=lambda source_id: (not str(source_id).startswith("sample:"), str(source_id)),
@@ -45,11 +45,12 @@ def refresh_stale(conn, ontology: Ontology) -> int:
         if get_meta(conn, _graph_key(source_id)) == ontology.digest:
             continue
         log.info("Graph file %s", source_id)
-        with _lock:
-            if get_meta(conn, _graph_key(source_id)) == ontology.digest:
-                continue
+        try:
             if _refresh_source(conn, ontology, source_id, None):
                 done += 1
+        except Exception:
+            log.exception("Graph file failed %s", source_id)
+            conn.rollback()
     return done
 
 
@@ -212,17 +213,24 @@ def _refresh_source(conn, ontology: Ontology, source_id: str, text: str | None) 
     chunks = [(row[0], row[1]) for row in rows]
     source_text = text if text is not None else "\n".join(row[1] for row in rows)
     source_text = source_text[:TEXT_LIMIT]
+    conn.commit()
     if not chunks:
-        replace_graph(conn, ontology, source_id, [], {"entities": [], "links": []}, ontology.digest)
+        with _lock:
+            replace_graph(conn, ontology, source_id, [], {"entities": [], "links": []}, ontology.digest)
         return True
     names = mentioned_aliases(ontology, source_text)
+    log.info("Graph extract %s", source_id)
     extracted = extract_text(ontology, source_text)
-    if extracted is None:
-        if names:
-            replace_graph(conn, ontology, source_id, chunks, {"entities": names, "links": []})
-        return False
-    extracted["entities"] = list(extracted.get("entities") or []) + names
-    replace_graph(conn, ontology, source_id, chunks, extracted, ontology.digest)
+    log.info("Graph save %s", source_id)
+    with _lock:
+        if get_meta(conn, _graph_key(source_id)) == ontology.digest:
+            return True
+        if extracted is None:
+            if names:
+                replace_graph(conn, ontology, source_id, chunks, {"entities": names, "links": []})
+            return False
+        extracted["entities"] = list(extracted.get("entities") or []) + names
+        replace_graph(conn, ontology, source_id, chunks, extracted, ontology.digest)
     return True
 
 
