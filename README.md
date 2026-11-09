@@ -78,7 +78,7 @@ Edit `ontology.yaml`, then redeploy. The service reads the chunks already stored
 | Key | Value |
 | --- | --- |
 | `EXTRACTION_API_KEY` | The model key. Empty means no graph. |
-| `EXTRACTION_BASE_URL` | The blueprint sets OpenCode Go. Replace it for another OpenAI-compatible endpoint. When this variable is unset, the code uses `https://api.openai.com/v1`. |
+| `EXTRACTION_BASE_URL` | The blueprint sets OpenCode Go, which uses `/chat/completions`. A Claude API key uses `https://api.anthropic.com/v1` and a Claude model name. When this variable is unset, the code uses `https://api.openai.com/v1`. |
 | `EXTRACTION_MODEL` | The blueprint sets `deepseek-v4.1-flash`. When this variable is unset, the code uses `gpt-4o-mini`. |
 
 The file text is sent to that model once, when the file is indexed. The first 20,000 characters are sent. The question is not sent there.

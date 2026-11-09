@@ -1,6 +1,7 @@
 import logging
 
 from app.embed import embed_query
+from app.extract import configured
 from app.graph import connected_hits
 from app.ontology import load_or_empty
 from app.store import keyword_hits, mark_shown, vector_hits
@@ -24,10 +25,11 @@ def search(conn, query: str, top_k: int = 5) -> list[dict]:
         ]
     )
     hits = [by_key[key] for key in order[:top_k]]
-    try:
-        hits = hits + connected_hits(conn, query, load_or_empty(), hits)
-    except Exception:
-        log.exception("Graph lookup failed")
+    if configured():
+        try:
+            hits = hits + connected_hits(conn, query, load_or_empty(), hits)
+        except Exception:
+            log.exception("Graph lookup failed")
     mark_shown(conn, [hit["id"] for hit in hits])
     return hits
 

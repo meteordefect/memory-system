@@ -78,3 +78,34 @@ def test_json_mode_refusal_retries_without_it(monkeypatch):
     assert "response_format" in calls[0]
     assert "response_format" not in calls[1]
     assert calls[1]["model"] == "demo-model"
+
+
+def test_anthropic_key_uses_the_messages_api(monkeypatch):
+    monkeypatch.setenv("EXTRACTION_API_KEY", "sk-ant-test")
+    monkeypatch.setenv("EXTRACTION_BASE_URL", "https://api.anthropic.com/v1")
+    monkeypatch.setenv("EXTRACTION_MODEL", "claude-haiku-5-5")
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return json.dumps(
+                {"content": [{"type": "text", "text": '{"entities": [], "links": []}'}]}
+            ).encode()
+
+    def fake_open(request, timeout=0):
+        assert request.full_url == "https://api.anthropic.com/v1/messages"
+        assert request.get_header("X-api-key") == "sk-ant-test"
+        assert request.get_header("Anthropic-version") == "2023-06-01"
+        assert request.get_header("X-opencode-session") is None
+        body = json.loads(request.data.decode())
+        assert body["model"] == "claude-haiku-5-5"
+        assert body["messages"][0]["content"] == "Arun"
+        return Response()
+
+    monkeypatch.setattr("app.extract.urllib.request.urlopen", fake_open)
+    assert complete("prompt", "Arun") == '{"entities": [], "links": []}'

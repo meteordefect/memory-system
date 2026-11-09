@@ -44,6 +44,7 @@ def test_search_bumps_only_returned_chunks(monkeypatch):
 
 
 def test_search_appends_a_connected_chunk(monkeypatch):
+    monkeypatch.setenv("EXTRACTION_API_KEY", "test-key")
     shown = {}
     _patch_search(monkeypatch, [_hit(3, 0, "unopened soy")], shown)
     extra = _hit(9, 0, "returned within 7 days")
@@ -58,7 +59,22 @@ def test_search_appends_a_connected_chunk(monkeypatch):
     assert text.startswith("Chunk: 3\nSource: a.md\nunopened soy")
 
 
+def test_search_skips_the_graph_without_a_key(monkeypatch):
+    monkeypatch.delenv("EXTRACTION_API_KEY", raising=False)
+    shown = {}
+    _patch_search(monkeypatch, [_hit(3, 0, "rice")], shown)
+
+    def boom(conn, query, ontology, hits):
+        raise AssertionError("graph")
+
+    monkeypatch.setattr("app.search.connected_hits", boom)
+    hits = search(None, "rice", top_k=1)
+    assert [hit["id"] for hit in hits] == [3]
+    assert "Connected:" not in format_hits(hits)
+
+
 def test_search_still_returns_chunks_when_the_graph_fails(monkeypatch):
+    monkeypatch.setenv("EXTRACTION_API_KEY", "test-key")
     shown = {}
     _patch_search(monkeypatch, [_hit(3, 0, "rice")], shown)
 

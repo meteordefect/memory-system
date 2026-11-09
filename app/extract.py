@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import threading
 import urllib.error
 import urllib.request
 
@@ -10,6 +11,8 @@ log = logging.getLogger("company-brain.graph")
 TEXT_LIMIT = 20_000
 DEFAULT_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_MODEL = "gpt-4o-mini"
+MAX_TOKENS = 1024
+CALL_TIMEOUT = 50
 
 
 def configured() -> bool:
@@ -86,9 +89,12 @@ def complete(prompt: str, text: str) -> str | None:
         return None
     base = os.environ.get("EXTRACTION_BASE_URL", DEFAULT_BASE_URL).strip().rstrip("/") or DEFAULT_BASE_URL
     model = os.environ.get("EXTRACTION_MODEL", DEFAULT_MODEL).strip() or DEFAULT_MODEL
+    if _anthropic(base):
+        return _anthropic_complete(base, key, model, prompt, text) or None
     messages = {
         "model": model,
         "temperature": 0,
+        "max_tokens": MAX_TOKENS,
         "messages": [
             {"role": "system", "content": prompt},
             {"role": "user", "content": text},
@@ -98,6 +104,40 @@ def complete(prompt: str, text: str) -> str | None:
     if content is None:
         content = _post(base, key, messages)
     return content or None
+
+
+def _anthropic(base: str) -> bool:
+    return "api.anthropic.com" in base
+
+
+def _anthropic_complete(base: str, key: str, model: str, prompt: str, text: str) -> str | None:
+    request = urllib.request.Request(
+        f"{base}/messages",
+        data=json.dumps(
+            {
+                "model": model,
+                "max_tokens": MAX_TOKENS,
+                "temperature": 0,
+                "system": prompt,
+                "messages": [{"role": "user", "content": text}],
+            }
+        ).encode(),
+        headers={
+            "x-api-key": key,
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json",
+            "User-Agent": "company-brain/1.0",
+        },
+        method="POST",
+    )
+    body = _exchange(request)
+    if body is None or body == "":
+        return body
+    try:
+        return body["content"][0]["text"]
+    except (KeyError, IndexError, TypeError):
+        log.warning("Extraction response had no message content")
+        return ""
 
 
 def _post(base: str, key: str, payload: dict) -> str | None:
@@ -112,21 +152,43 @@ def _post(base: str, key: str, payload: dict) -> str | None:
         },
         method="POST",
     )
-    try:
-        with urllib.request.urlopen(request, timeout=45) as response:
-            body = json.loads(response.read().decode())
-    except urllib.error.HTTPError as error:
-        detail = error.read().decode(errors="replace")[:300]
-        if error.code == 400 and "response_format" in payload:
-            log.info("Extraction endpoint refused JSON mode. Retrying without it.")
-            return None
-        log.warning("Extraction failed: HTTP %s %s", error.code, detail)
-        return ""
-    except urllib.error.URLError as error:
-        log.warning("Extraction request failed: %s", error.reason)
-        return ""
+    body = _exchange(request, payload)
+    if body is None or body == "":
+        return body
     try:
         return body["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError):
         log.warning("Extraction response had no message content")
         return ""
+
+
+def _exchange(request: urllib.request.Request, payload: dict | None = None):
+    box = {}
+
+    def run() -> None:
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                box["body"] = json.loads(response.read().decode()[:500_000])
+        except Exception as exc:
+            box["error"] = exc
+
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
+    thread.join(CALL_TIMEOUT)
+    if thread.is_alive():
+        log.warning("Extraction timed out")
+        return ""
+    error = box.get("error")
+    if isinstance(error, urllib.error.HTTPError):
+        detail = error.read().decode(errors="replace")[:300]
+        if error.code == 400 and payload and "response_format" in payload:
+            log.info("Extraction endpoint refused JSON mode. Retrying without it.")
+            return None
+        log.warning("Extraction failed: HTTP %s %s", error.code, detail)
+        return ""
+    if isinstance(error, urllib.error.URLError):
+        log.warning("Extraction request failed: %s", error.reason)
+        return ""
+    if error is not None:
+        raise error
+    return box.get("body")

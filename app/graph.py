@@ -35,10 +35,16 @@ def refresh_stale(conn, ontology: Ontology) -> int:
         ORDER BY source_id
         """
     ).fetchall()
+    conn.commit()
+    source_ids = sorted(
+        (row[0] for row in rows),
+        key=lambda source_id: (not str(source_id).startswith("sample:"), str(source_id)),
+    )
     done = 0
-    for (source_id,) in rows:
+    for source_id in source_ids:
         if get_meta(conn, _graph_key(source_id)) == ontology.digest:
             continue
+        log.info("Graph file %s", source_id)
         with _lock:
             if get_meta(conn, _graph_key(source_id)) == ontology.digest:
                 continue
@@ -155,10 +161,13 @@ def connected_hits(conn, query: str, ontology: Ontology, hits: list[dict], limit
         current = best.get(row[0])
         if current is None or row[6] < current[6]:
             best[row[0]] = row
-    skip = {(hit["source_id"], hit["chunk_idx"]) for hit in hits}
+    already = {(hit["source_id"], hit["chunk_idx"]): hit for hit in hits}
     chosen = []
     for row in sorted(best.values(), key=lambda item: (item[6], item[0])):
-        if (row[1], row[3]) in skip:
+        current = already.get((row[1], row[3]))
+        if current is not None:
+            if not current.get("path"):
+                current["path"] = row[5]
             continue
         chosen.append(
             {
