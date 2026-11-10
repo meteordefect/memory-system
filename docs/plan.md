@@ -32,14 +32,14 @@ Yes, for the job it is: Claude searches documents from one Drive folder, on the 
 | BGE-small, 384 dimensions | The right small local model. Run it through ONNX (`fastembed`), with the model baked into the image. PyTorch on the 2 GB plan is the thing that gets the process killed. The vectors stay 384. |
 | Hybrid search | `tsvector` and cosine distance, merged in the app. A company folder is small, so cosine search is exact. An ivfflat index is for a much larger table. |
 | Drive ingest every 2 minutes | Works while the paid instance stays up. The free plan sleeps, so the blueprint stays on `1c-2g`. |
-| ChatGPT on the same URL | Later. ChatGPT's custom MCP takes OAuth or no authentication. It has nowhere to put the bearer key. Opening the URL to get ChatGPT working would publish the folder. |
+| ChatGPT on the same URL | OAuth on this service. ChatGPT's custom MCP takes OAuth or no authentication. It has nowhere to put the bearer key. The folder stays behind the sign-in. |
 
 ## Decisions
 
 | Topic | Decision |
 | --- | --- |
 | Claude auth | Render generates `MCP_API_KEY`. Claude sends `Authorization: Bearer <key>`. The rehearsal already used this header. |
-| ChatGPT | Waits for OAuth. Not part of the first deploy. |
+| ChatGPT | OAuth on this service when `OAUTH_ENABLED` is set. One bootstrap email and password. |
 | Tools | `search` and `list_sources`. Ingest stays on the server. |
 | Files | Google Docs, Sheets, and Slides, plus pdf, docx, xlsx, md, and txt. Subfolders included. Other types are skipped and counted. |
 | Deletes | Each run lists every file id in the folder. Chunks whose file left the folder get `deleted_at` set. Search skips those rows. |
@@ -242,7 +242,7 @@ volumes:
 
 ## Client config
 
-Claude, custom connector. The URL is `https://<service>.onrender.com/mcp`. Authentication is the bearer header above. Choose no OAuth sign-in.
+Claude and ChatGPT. The URL is `https://<service>.onrender.com/mcp`. Both sign in with the bootstrap email and password. The callbacks are the exact addresses in [oauth-chatgpt.md](oauth-chatgpt.md). The bearer header above still opens the same URL.
 
 Claude Desktop, when it is the client instead of the website:
 
@@ -260,7 +260,7 @@ Claude Desktop, when it is the client instead of the website:
 }
 ```
 
-ChatGPT Business can use this URL once the server speaks OAuth. The plan is [oauth-chatgpt.md](oauth-chatgpt.md). It is not built. A static key does not fit ChatGPT's connector.
+ChatGPT uses the same URL when `OAUTH_ENABLED` is set. The sign-in is the bootstrap user in `render.yaml`. The plan is [oauth-chatgpt.md](oauth-chatgpt.md). A static key does not fit ChatGPT's connector.
 
 ## Later additions
 

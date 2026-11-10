@@ -1,6 +1,7 @@
 # Company brain. One image: the app, Postgres, and the embedder.
 # Render builds it. A disk holds the database. Do not use the free instance:
 # it sleeps, and a sleeping service does not sync.
+# Sign-in is on for Claude and ChatGPT. The password is generated. The email is the default below.
 # https://render.com/docs/blueprint-spec
 
 services:
@@ -17,6 +18,12 @@ services:
       sizeGB: 10
     envVars:
       - key: MCP_API_KEY
+        generateValue: true
+      - key: OAUTH_ENABLED
+        value: "1"
+      - key: OAUTH_BOOTSTRAP_EMAIL
+        value: owner@company-brain.local
+      - key: OAUTH_BOOTSTRAP_PASSWORD
         generateValue: true
       - key: GDRIVE_FOLDER_ID
         sync: false

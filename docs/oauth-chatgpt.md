@@ -1,6 +1,12 @@
 # ChatGPT OAuth
 
-Plan only. No code yet. Claude keeps the bearer key. ChatGPT is advertised only after the proof at the bottom passes on the live test service.
+The routes ship in this image. `OAUTH_ENABLED` unset leaves them unmounted. Claude and ChatGPT both register against this sign-in. The bearer key still opens `/mcp`. A live connector is the remaining proof.
+
+## On Render
+
+`render.yaml` sets `OAUTH_ENABLED` to `1`, sets the sign-in email to `owner@company-brain.local`, and generates `OAUTH_BOOTSTRAP_PASSWORD`. The deploy screen still asks for the Drive folder and the service account. The password is on the service Environment page. Claude and ChatGPT both use it. A bearer header can still send `MCP_API_KEY`.
+
+`tests/test_oauth.py` covers the 401 challenge, the bearer key, the redirect allowlist, PKCE, replay, refresh rotation, and audience checks. A ChatGPT connector on a live URL is still the proof for search and revoke.
 
 ChatGPT's connector has two choices: OAuth, or no authentication. It has nowhere to put `MCP_API_KEY`. Taking the bearer check off `/mcp` would publish the folder. This plan adds OAuth on the same container so a person can sign in and ChatGPT can hold a short-lived token.
 
@@ -14,7 +20,7 @@ All six are true on `https://company-brain-4f8c.onrender.com`:
 2. `/mcp` with `Authorization: Bearer <MCP_API_KEY>` still searches.
 3. A ChatGPT connector, after the bootstrap user signs in, runs `search` and gets a sample passage back.
 4. The same connector with the token revoked gets 401 and no passage.
-5. An authorize or register request whose redirect is not a ChatGPT connector URL is rejected.
+5. An authorize or register request whose redirect is not on the allowlist is rejected.
 6. Replaying an authorization code is rejected.
 
 Until then the event line stays "Ask Claude". Do not say ChatGPT, and do not say the sign-in is secure.
@@ -59,8 +65,12 @@ Redirect allowlist, exact strings:
 
 - `https://chatgpt.com/connector_platform_oauth_redirect`
 - The callback URL shown on that connector's page, once it exists, in the form `https://chatgpt.com/connector/oauth/<callback_id>`
+- `https://claude.ai/api/mcp/auth_callback`
+- `https://claude.com/api/mcp/auth_callback`
 
-No other redirect. No wildcard.
+No other redirect. No wildcard. A localhost callback is rejected. Claude Code uses one, so this sign-in is for Claude in the browser and the desktop app, and for ChatGPT.
+
+This server does not advertise a published-identity document. Claude falls back to dynamic registration, which is the same call ChatGPT makes. If Claude shows a client choice, leave **Register automatically** selected.
 
 The authorization response includes `iss`, and the metadata says `authorization_response_iss_parameter_supported: true`, so ChatGPT can use the stable redirect. `iss` is the issuer string, character for character.
 

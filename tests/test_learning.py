@@ -96,9 +96,12 @@ def test_empty_search_marks_nothing(monkeypatch):
 
 
 def test_bearer_guard_still_fails_closed():
-    text = open("app/main.py", encoding="utf-8").read()
-    assert "if not key:\n        return False" in text
-    assert 'startswith("/mcp")' in text
+    main = open("app/main.py", encoding="utf-8").read()
+    guard = open("app/oauth.py", encoding="utf-8").read()
+    assert 'app = BearerGuard(http, os.environ.get("MCP_API_KEY", ""))' in main
+    assert 'startswith("/mcp")' in guard
+    assert 'if key and _same(got, f"Bearer {key}"):\n        return True' in guard
+    assert "if not enabled():\n        return False" in guard
 
 
 def test_existing_bank_keeps_rows_through_migration(conn):

@@ -13,7 +13,10 @@ def conn():
         pytest.skip("TEST_DATABASE_URL is not set")
     with psycopg.connect(url) as connection:
         init_schema(connection)
-        connection.execute("TRUNCATE entities, facts, chunk_feedback RESTART IDENTITY CASCADE")
+        connection.execute(
+            "TRUNCATE oauth_tokens, oauth_codes, oauth_sessions, oauth_clients, oauth_users, "
+            "entities, facts, chunk_feedback RESTART IDENTITY CASCADE"
+        )
         connection.execute("DELETE FROM meta WHERE key LIKE 'graph:%%'")
         connection.commit()
         yield connection

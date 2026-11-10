@@ -1,6 +1,5 @@
 import logging
 import os
-import secrets
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -17,6 +16,7 @@ from app.embed import embed_query
 from app.ingest import load_new_samples
 from app.search import format_hits
 from app.search import search as hybrid_search
+from app.oauth import BearerGuard, enabled as oauth_enabled, ensure_bootstrap, register_routes
 from app.store import connect, init_schema, record_feedback
 from app.store import list_sources as indexed_sources
 
@@ -84,6 +84,8 @@ async def lifespan(_app):
     _wait_for_db()
     with connect() as conn:
         init_schema(conn)
+        if oauth_enabled():
+            ensure_bootstrap(conn)
         sample_dir = SAMPLE if SAMPLE.is_dir() else SAMPLE.parent
         for name in load_new_samples(conn, sample_dir):
             log.info("Loaded sample %s", name)
@@ -110,6 +112,7 @@ def _wait_for_db() -> None:
     raise RuntimeError("Postgres did not become ready")
 
 
+register_routes(mcp)
 http = mcp.streamable_http_app(
     stateless_http=True,
     json_response=True,
@@ -119,28 +122,6 @@ http = mcp.streamable_http_app(
 if not hasattr(http.router, "lifespan_context"):
     raise RuntimeError("This Starlette build has no router.lifespan_context")
 http.router.lifespan_context = lifespan
-
-
-class BearerGuard:
-    def __init__(self, app, key: str):
-        self.app = app
-        self.key = key
-
-    async def __call__(self, scope, receive, send):
-        if scope["type"] == "http" and scope.get("path", "").startswith("/mcp"):
-            if not _authorized(scope, self.key):
-                await JSONResponse({"error": "unauthorized"}, status_code=401)(scope, receive, send)
-                return
-        await self.app(scope, receive, send)
-
-
-def _authorized(scope, key: str) -> bool:
-    if not key:
-        return False
-    headers = {name.decode().lower(): value.decode() for name, value in scope.get("headers", [])}
-    expected = f"Bearer {key}"
-    got = headers.get("authorization", "")
-    return secrets.compare_digest(got.encode(), expected.encode())
 
 
 app = BearerGuard(http, os.environ.get("MCP_API_KEY", ""))

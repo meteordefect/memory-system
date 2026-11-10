@@ -13,6 +13,7 @@ https://render.com/deploy?repo=https://github.com/meteordefect/memory-system
 ```mermaid
 flowchart LR
   Claude["Claude"]
+  ChatGPT["ChatGPT"]
   Drive["Shared Drive folder"]
   Model["Extraction model"]
 
@@ -23,18 +24,19 @@ flowchart LR
   end
 
   Claude -->|"HTTPS and bearer"| MCP
+  ChatGPT -->|"HTTPS and OAuth"| MCP
   Drive -->|"read-only, every 2 min"| MCP
   MCP -->|"file text, when the key is set"| Model
   Model -->|"names and links"| MCP
 ```
 
-Claude sends a question to `https://company-brain-xxxx.onrender.com/mcp` with a bearer key. Render assigns the `xxxx` once, when that company deploys, so each service has its own host. The host stays the same on later deploys. The service embeds the question with the local model, searches the chunks, and returns the best passages. Claude writes the answer. Every 2 minutes the same process reads the Drive folder and replaces the chunks for files that changed. When `EXTRACTION_API_KEY` is set, each saved file is also sent to the extraction model, and the names and links are stored in the same database. That path is [The graph](#the-graph). ChatGPT uses this URL only after OAuth exists. That work has not started. The plan is [docs/oauth-chatgpt.md](docs/oauth-chatgpt.md). Until the proof in that doc passes, Claude is the client.
+Claude and ChatGPT both send a question to `https://company-brain-xxxx.onrender.com/mcp`. Render assigns the `xxxx` once, when that company deploys, so each service has its own host. The host stays the same on later deploys. The service embeds the question with the local model, searches the chunks, and returns the best passages. The chat model writes the answer. Every 2 minutes the same process reads the Drive folder and replaces the chunks for files that changed. When `EXTRACTION_API_KEY` is set, each saved file is also sent to the extraction model, and the names and links are stored in the same database. That path is [The graph](#the-graph). Both clients sign in with the same email and password. The blueprint turns that on and generates the password. The live checks are in [docs/oauth-chatgpt.md](docs/oauth-chatgpt.md). A bearer key still opens the same URL.
 
 ## Status
 
 Claude search is proven on a test service at `https://company-brain-4f8c.onrender.com/mcp` with the bearer key. The sample files in `sample/` are loaded into the index on boot when that file is not already stored: the price list, the bolt price, the 2024 rice price, the Friday lunch rule, and the demo emails and invoices in `sample/demo/`. Drive sync runs after `GDRIVE_FOLDER_ID` and `GDRIVE_SERVICE_ACCOUNT_JSON` are set and that folder is shared with the service account. The test service has both values. Files show up once the share is in place.
 
-Staff sign-in by company email is WorkOS, and it is not part of this deploy. Today everyone who has the bearer key can search.
+Staff sign-in by company email is WorkOS, and it is not part of this deploy. The sign-in on this service is one shared email and password. Claude and ChatGPT both use it, and anyone with that password can search the whole folder. A bearer key can still search. A live connector is the remaining check.
 
 `main` and `hindsight` still hold the earlier Hindsight workshop. This branch is the new build. `render.yaml` is this app's Blueprint.
 
@@ -171,7 +173,7 @@ On the deploy screen, paste them when Render asks:
 | `GDRIVE_FOLDER_ID` | The folder id from the address bar |
 | `GDRIVE_SERVICE_ACCOUNT_JSON` | The whole downloaded file |
 
-The JSON value starts with `{` and includes `"type": "service_account"`. Paste the file as it downloaded. Leave Render's generated `MCP_API_KEY` alone.
+The JSON value starts with `{` and includes `"type": "service_account"`. Paste the file as it downloaded. Leave Render's generated `MCP_API_KEY` and `OAUTH_BOOTSTRAP_PASSWORD` alone.
 
 To add them after the service is already live:
 
@@ -218,9 +220,27 @@ Pictures, `.doc`, `.xls`, and anything else are skipped. A file over 20 MB is sk
 
 If Claude still shows only the price list, open the folder's Share dialog and check that the `client_email` is listed as Viewer. Then use **Save and deploy** again, or wait for the next 2-minute check.
 
+## Connect Claude or ChatGPT
+
+Both clients use the same MCP URL and the same sign-in. Choose OAuth. ChatGPT has nowhere to paste `MCP_API_KEY`. Claude uses the same registration when the server does not advertise a published identity.
+
+The blueprint sets `OAUTH_ENABLED` to `1` and the sign-in email to `owner@company-brain.local`. Render generates `OAUTH_BOOTSTRAP_PASSWORD`. After the service is live, open **Environment** and copy that password.
+
+Add this URL in either client:
+
+```text
+https://company-brain-xxxx.onrender.com/mcp
+```
+
+When the browser opens, sign in with `owner@company-brain.local` and `OAUTH_BOOTSTRAP_PASSWORD`, then choose **Allow**. That connection can search the whole folder. To use a different email, change `OAUTH_BOOTSTRAP_EMAIL` on the Environment page and choose **Save and deploy**.
+
+If Claude shows a client choice, leave **Register automatically** selected. The published-identity option is a different method, and this server does not advertise it. `Authorization: Bearer` plus `MCP_API_KEY` still works, and that path does not need the password.
+
 ## Security
 
 Render generates `MCP_API_KEY`. Claude sends it as `Authorization: Bearer <key>`, the same header the last workshop used. Anyone with that key can search the whole folder. The service does not copy each person's own Drive permissions.
+
+ChatGPT sign-in uses a second secret. The password is hashed with scrypt. Access tokens start with `cb_at_`, last one hour, and are stored as hashes. Refresh tokens rotate. The signed-in user can search the whole folder, the same as the bearer key.
 
 Postgres listens on localhost inside the container. Its files sit on the service disk. The service account can read only the folder shared with it.
 
