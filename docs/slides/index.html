@@ -66,9 +66,12 @@
     .cd .n { font-size: 22px; color: var(--soft); }
     .cd.pl { background: var(--pur-tint); border: 1px solid var(--pur-line); }
     .cd.pl h3, .cd.pl .n { color: var(--pur-ink); }
+    .quote { max-width: 1500px; font-size: 42px; line-height: 1.28; font-weight: 500; letter-spacing: -0.02em; text-wrap: pretty; }
     .stack { display: flex; flex-direction: column; gap: 18px; justify-content: center; flex: 1; }
     .chrome { position: absolute; left: 0; right: 0; bottom: 0; height: 64px; z-index: 5; pointer-events: none; }
-    .brand { position: absolute; left: 96px; bottom: 26px; font-size: 17px; color: var(--faint); }
+    .brand { position: absolute; left: 96px; bottom: 20px; height: 32px; }
+    .brand img { display: block; height: 32px; width: auto; }
+    .mark { position: absolute; right: 96px; bottom: 140px; height: 88px; width: auto; z-index: 2; }
     .where { position: absolute; right: 96px; bottom: 26px; display: flex; gap: 18px; font-size: 17px; color: var(--faint); }
     .where .count { font-variant-numeric: tabular-nums; color: var(--soft); }
     .progress { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; display: flex; gap: 2px; pointer-events: auto; }
@@ -109,6 +112,7 @@
   <div class="stage" id="stage">
 
     <section class="slide is-active" data-label="Intro">
+      <img class="mark" src="cipher-projects.webp" alt="Cipher Projects" />
       <div class="title">
         <p class="kicker rise">Company Brain</p>
         <h1 class="rise" style="--d: 0.06s">Search with the real files</h1>
@@ -136,6 +140,15 @@
       <p class="cap">Without those files, the agent is guessing.</p>
     </section>
 
+    <section class="slide" data-label="Karpathy">
+      <h2>A personal wiki fits in the chat</h2>
+      <p class="sub">Andrej Karpathy, 2 April 2026. His research wiki was about 100 articles and 400,000 words.</p>
+      <div class="body" style="justify-content: center;">
+        <p class="quote rise" style="--d: 0.05s">“I thought I had to reach for fancy RAG, but the LLM has been pretty good about auto-maintaining index files and brief summaries of all the documents and it reads all the important related data fairly easily at this ~small scale.”</p>
+      </div>
+      <p class="cap">A company folder is larger than that chat. Search brings the passage back. The graph follows a shared name into the next file.</p>
+    </section>
+
     <section class="slide" data-label="Real files">
       <h2>Real information is the files</h2>
       <p class="sub">Search is the tool. The passages are what the agent is allowed to use.</p>
@@ -150,12 +163,12 @@
           <div class="bx" style="width: 340px; height: 200px;"><b>Answer</b><small>Written from the passages</small></div>
         </div>
       </div>
-      <p class="cap">The agent does not invent the policy. <b>It reads the passage the brain returned.</b></p>
+      <p class="cap">The agent writes from the passage the brain returned.</p>
     </section>
 
     <section class="slide" data-label="RAG">
       <h2>RAG is search, then the answer</h2>
-      <p class="sub">Retrieval-augmented generation. The name is the order of the work.</p>
+      <p class="sub">Retrieval-augmented generation. The model cannot hold the folder, so search brings the passage, then the agent writes.</p>
       <div class="body" style="justify-content: center;">
         <div class="flow rise" style="--d: 0.05s">
           <div class="bx" style="width: 360px; height: 210px;"><b>Question</b><small>Who asked to return the soy?</small></div>
@@ -225,8 +238,58 @@
       <p class="cap">Sources: demo/email-kedron-soy-return.md, price-list.md, demo/invoice-1047.md.</p>
     </section>
 
+    <section class="slide" data-label="MCP">
+      <h2>MCP is the call Claude already knows</h2>
+      <p class="sub">Claude calls a tool on this server. The server searches Postgres.</p>
+      <div class="body" style="justify-content: center;">
+        <div class="flow rise" style="--d: 0.05s">
+          <div class="bx" style="width: 340px; height: 210px;"><b>Claude</b><small>Custom connector</small></div>
+          <i class="ar"></i>
+          <div class="bx p" style="width: 420px; height: 210px;"><b>/mcp</b><small>search, list_sources, feedback</small></div>
+          <i class="ar pu"></i>
+          <div class="bx pl" style="width: 420px; height: 210px;"><b>Passages</b><small>Filename and the chunk</small></div>
+          <i class="ar"></i>
+          <div class="bx" style="width: 340px; height: 210px;"><b>Claude writes</b><small>From those passages</small></div>
+        </div>
+      </div>
+      <p class="cap">Paste a file into the chat and it goes stale. The tool reads the folder on the server.</p>
+    </section>
+
+    <section class="slide" data-label="Security">
+      <h2>One key sees the whole folder</h2>
+      <p class="sub">Claude sends a bearer key. ChatGPT has nowhere to put that key.</p>
+      <div class="body">
+        <div class="split rise" style="--d: 0.05s">
+          <div class="cd">
+            <p class="n">Claude, this room</p>
+            <h3>Bearer, no OAuth</h3>
+            <p>The connector URL ends in /mcp. The header is Authorization: Bearer, then MCP_API_KEY. An empty key fails closed. Anyone who has the key can search every file.</p>
+          </div>
+          <div class="cd pl">
+            <p class="n">Not on this service yet</p>
+            <h3>OAuth, then WorkOS</h3>
+            <p>ChatGPT’s connector is OAuth, or no authentication. An open URL would publish the folder. OAuth is the plan for ChatGPT. Sign-in by company email is WorkOS, and it comes after that.</p>
+          </div>
+        </div>
+      </div>
+      <p class="cap">The key does not copy each person’s own Drive permissions.</p>
+    </section>
+
+    <section class="slide" data-label="Connectors">
+      <h2>This room adds one connector</h2>
+      <p class="sub">Claude, pointed at this brain. The same chat can hold another server.</p>
+      <div class="body" style="justify-content: center;">
+        <div class="flow rise" style="--d: 0.05s">
+          <div class="bx p l" style="width: 520px; height: 300px;"><b>Today</b><small style="margin-top: 16px;">One custom connector.<br>One Drive folder.<br>The brain searches that folder.</small></div>
+          <div class="bx l" style="width: 520px; height: 300px; margin-left: 24px;"><b>Already in the folder</b><small style="margin-top: 16px;">The Kedron email.<br>The price list.<br>Invoice 1047.</small></div>
+          <div class="bx pl l" style="width: 520px; height: 300px; margin-left: 24px;"><b>Add beside it</b><small style="margin-top: 16px;">A second MCP server.<br>Salesforce, a CRM, or the mailbox.<br>That server answers from the live system.</small></div>
+        </div>
+      </div>
+      <p class="cap">This service does not ship those systems. The client adds the one the company already uses.</p>
+    </section>
+
     <div class="chrome" aria-hidden="true">
-      <div class="brand">Company Brain</div>
+      <div class="brand"><img src="cipher-projects.webp" alt="Cipher Projects" /></div>
       <div class="where"><span class="keyhint">N · notes</span><span class="sec"></span><span class="count"></span></div>
       <div class="progress"></div>
     </div>
@@ -250,30 +313,50 @@
         <p>An agent with no company files will still answer. The answer is about companies in general. It cannot know who emailed, or what this wholesaler’s return rule is.</p>
       </article>
       <article data-for="2">
-        <h3>Real information</h3>
+        <h3>Karpathy</h3>
         <p class="k">Slide 03</p>
-        <p>Claude calls search. The brain returns a few passages, with filenames. The agent writes from those. That is how the answer gets better: the information is real, and it is this company’s.</p>
+        <p>The line is from his 2 April 2026 post, LLM Knowledge Bases. He keeps raw sources, and the model maintains a markdown wiki. At about 100 articles he did not need a retrieval index. Say that, then the difference: this room’s folder is the company’s email, invoices, and price list, and the model cannot hold all of it. The Upgraded video opens on that personal wiki. We build the Render search, not the Obsidian vault. The Sequoia article From Hierarchy to Intelligence is Botha and Dorsey, 31 March 2026. It is not his paper.</p>
       </article>
       <article data-for="3">
-        <h3>RAG</h3>
+        <h3>Real information</h3>
         <p class="k">Slide 04</p>
-        <p>The question is embedded with the same small model as the files. The closest chunks come back, merged with a keyword match. The agent then writes. One passage is enough when the whole answer sits in that passage.</p>
+        <p>Claude calls search. The brain returns a few passages, with filenames. The agent writes from those. That is how the answer gets better: the information is real, and it is this company’s.</p>
       </article>
       <article data-for="4">
-        <h3>The gap</h3>
+        <h3>RAG</h3>
         <p class="k">Slide 05</p>
-        <p>Arun’s email and the seven-day rule do not live in the same file. Similarity can rank the email first and never surface the price list. The shared product is the missing step.</p>
+        <p>The question is embedded with the same small model as the files. The closest chunks come back, merged with a keyword match. The agent then writes. One passage is enough when the whole answer sits in that passage.</p>
       </article>
       <article data-for="5">
-        <h3>Graph RAG</h3>
+        <h3>The gap</h3>
         <p class="k">Slide 06</p>
-        <p>On ingest, the service records people, companies, and products, and the links the ontology allows. Search still starts with the closest chunks. A chunk that shares a name, or sits one or two links away, can be added. It is marked Connected. On the 9 Nov check that line on the price list was Company: Northline Wholesale, not the product name.</p>
+        <p>Arun’s email and the seven-day rule do not live in the same file. Similarity can rank the email first and never surface the price list. The shared product is the missing step.</p>
       </article>
       <article data-for="6">
-        <h3>The check</h3>
+        <h3>Graph RAG</h3>
         <p class="k">Slide 07</p>
+        <p>On ingest, the service records people, companies, and products, and the links the ontology allows. Search still starts with the closest chunks. A chunk that shares a name, or sits one or two links away, can be added. It is marked Connected. On the 9 Nov check that line on the price list was Company: Northline Wholesale, not the product name.</p>
+      </article>
+      <article data-for="7">
+        <h3>The check</h3>
+        <p class="k">Slide 08</p>
         <p>Asked in Claude on 9 Nov 2026. With the key on, Claude said Arun Shah of Kedron Street Kitchen, account KSK-19, emailed accounts@northline.example on 4 Nov asking to return 3 unopened 1-litre bottles of light soy sauce, SKU NL-SOY-1, from the 26 Oct delivery. The price list allows unopened dry goods back within 7 days. His email puts the ask at 9 days, so the request is outside that rule. Opened bottles cannot be returned, but these were unopened. Invoice 1047, dated 3 Nov, is a 4-pack rice order and does not show the soy purchase. No reply to Arun is in the files. Sources Claude named: demo/email-kedron-soy-return.md, price-list.md, demo/invoice-1047.md.</p>
         <p>The same question with the key off still returned the Kedron email and the 7-day sentence, and Claude reached the same conclusion. It did not bring in invoice 1047, and the tool printed no Connected line. With the key on, the price-list passage carried Connected: Company: Northline Wholesale.</p>
+      </article>
+      <article data-for="8">
+        <h3>MCP</h3>
+        <p class="k">Slide 09</p>
+        <p>MCP is the protocol Claude’s custom connector speaks. The service exposes three tools at /mcp: search, list_sources, and feedback. Claude calls search and writes from the passages. A file pasted into the chat is a copy. The tool reads the indexed folder, and Drive sync replaces a file when it changes.</p>
+      </article>
+      <article data-for="9">
+        <h3>Security</h3>
+        <p class="k">Slide 10</p>
+        <p>Render generates MCP_API_KEY. Claude sends Authorization: Bearer and that key. There is no OAuth on this connector. One key searches the whole folder. The service does not apply each person’s Google Drive permissions. ChatGPT cannot store a bearer key. Its choices are OAuth or an open URL, and an open URL would publish the folder. OAuth is written up in docs/oauth-chatgpt.md and is not built. WorkOS, sign-in by company email, is later still.</p>
+      </article>
+      <article data-for="10">
+        <h3>Connectors</h3>
+        <p class="k">Slide 11</p>
+        <p>This room connects Claude to one brain, and the brain reads one Drive folder. Email in the demo is a file in that folder, not a live mailbox. A second connector is another MCP server in the same client. The plan names Salesforce as that kind of server: it answers from Salesforce, and this brain keeps searching the folder. The client can add the CRM or the mailbox the company already uses. This repo does not include those servers.</p>
       </article>
     </div>
     <footer>N opens and closes this. Arrows move. F is fullscreen.</footer>
@@ -286,7 +369,7 @@
       var progress = stage.querySelector(".progress");
       var secEl = stage.querySelector(".where .sec");
       var countEl = stage.querySelector(".where .count");
-      var brand = stage.querySelector(".brand").textContent;
+      var brand = stage.querySelector(".brand").innerHTML;
       var index = 0;
       var notesEl = document.getElementById("notes");
 
