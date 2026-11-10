@@ -235,4 +235,4 @@ ontology.yaml         entity types, relationships, and aliases
 app/                  MCP tools, Drive sync, and the graph
 ```
 
-Schema, the Blueprint, and the Claude steps are in [docs/plan.md](docs/plan.md). Queue and chunk settings are in [docs/tech-specs.md](docs/tech-specs.md).
+Schema, the Blueprint, and the Claude steps are in [docs/plan.md](docs/plan.md). Queue and chunk settings are in [docs/tech-specs.md](docs/tech-specs.md). The workshop intro video is in [docs/learning.md](docs/learning.md).
