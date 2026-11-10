@@ -1,6 +1,6 @@
 # Company Brain
 
-One container. It reads one shared Google Drive folder into Postgres, and Claude searches that index. The chat model writes the answer. This service returns chunks, filenames, and scores.
+One container. It reads one shared Google Drive folder into Postgres, and Claude searches that index. The chat model writes the answer. This service returns the passages and the file each one came from.
 
 The container holds the MCP app, Postgres, and the embedding model. Data sits on a volume. Render is the first host: one link, Deploy, then the service URL. A later host runs the same image with a volume and HTTPS. The app itself stays the same.
 
@@ -14,6 +14,7 @@ https://render.com/deploy?repo=https://github.com/meteordefect/memory-system
 flowchart LR
   Claude["Claude"]
   Drive["Shared Drive folder"]
+  Model["Extraction model"]
 
   subgraph box ["One container"]
     MCP["MCP"]
@@ -23,9 +24,11 @@ flowchart LR
 
   Claude -->|"HTTPS and bearer"| MCP
   Drive -->|"read-only, every 2 min"| MCP
+  MCP -->|"file text, when the key is set"| Model
+  Model -->|"names and links"| MCP
 ```
 
-Claude sends a question to `https://company-brain-xxxx.onrender.com/mcp` with a bearer key. Render assigns the `xxxx` once, when that company deploys, so each service has its own host. The host stays the same on later deploys. The service embeds the question, searches the chunks, and returns the best ones. Every 2 minutes the same process reads the Drive folder and replaces the chunks for files that changed. ChatGPT uses this URL only after OAuth exists. Until then, Claude is the client.
+Claude sends a question to `https://company-brain-xxxx.onrender.com/mcp` with a bearer key. Render assigns the `xxxx` once, when that company deploys, so each service has its own host. The host stays the same on later deploys. The service embeds the question with the local model, searches the chunks, and returns the best passages. Claude writes the answer. Every 2 minutes the same process reads the Drive folder and replaces the chunks for files that changed. When `EXTRACTION_API_KEY` is set, each saved file is also sent to the extraction model, and the names and links are stored in the same database. That path is [The graph](#the-graph). ChatGPT uses this URL only after OAuth exists. That work has not started. The plan is [docs/oauth-chatgpt.md](docs/oauth-chatgpt.md). Until the proof in that doc passes, Claude is the client.
 
 ## Status
 
@@ -55,7 +58,7 @@ Served at `/mcp`.
 
 | Tool | What it does |
 | --- | --- |
-| `search` | Top chunks for a query, with filename, chunk id, and score. Default 5. May add up to 3 connected chunks. Skips soft-deleted and heavily demoted chunks |
+| `search` | Closest chunks for a query, with filename and chunk id. Default 5. When the extraction key is set, may add up to 3 connected chunks. Skips soft-deleted and heavily demoted chunks |
 | `list_sources` | What is indexed, how many live chunks, when the last sync ran |
 | `feedback` | Mark a returned chunk `useful`, `wrong`, or `outdated`. Does not edit Drive |
 
@@ -69,19 +72,35 @@ The Drive folder is shared with a Google Cloud service account. The account is r
 
 ## The graph
 
-Search still returns the closest chunks. `ontology.yaml` is the file students edit. It lists the entity types and the relationships that are allowed. Person, Company, and Product are the starter set, with the sample company filled in as aliases.
+The closest chunks come from the vectors and the keyword index. The names and links are a second set of rows in the same Postgres. Each row points back at the chunk it came from.
 
-When `EXTRACTION_API_KEY` is set, each saved file is read once for those names and links. The rows sit in the same Postgres database and point back at the chunk. A later question can bring back another chunk that shares a name, or a chunk one or two links away. That extra passage has a Connected line. The line is data.
+```mermaid
+flowchart LR
+  YAML["ontology.yaml"]
+  File["Saved file"]
+  Model["DeepSeek Flash"]
+  DB[("entities and links")]
+  Search["Search"]
 
-Edit `ontology.yaml`, then redeploy. The service reads the chunks already stored and writes the links again. The embeddings stay. Leave the key empty and this step is skipped, so search is unchanged. Leave `relationships` empty and the names are still stored. Two spellings become one row only when both are in the alias list. The model copies the name written in the file. A name in the alias list is also stored when the file contains it, once the key is set. A failed model call is retried, and those names are still written.
+  YAML --> Model
+  File --> Model
+  Model -->|"allowed names and links"| DB
+  Search -->|"up to 3 extra chunks"| DB
+```
+
+`ontology.yaml` is the file students edit. It lists the entity types, the relationships that are allowed, and the alias list. Person, Company, and Product are the starter set, with the sample company filled in as aliases. The model copies the name written in the document. A type or a relationship is stored only when `ontology.yaml` lists it. Two spellings become one row only when both are in the alias list.
+
+When `EXTRACTION_API_KEY` is set, the file text is sent when the file is indexed. The first 20,000 characters are sent. The question is not sent there. The blueprint uses DeepSeek Flash through OpenCode Go. A later question still returns the closest chunks, and can add up to 3 more that share a name or sit one or two links away. That extra passage has a Connected line. The line is data.
+
+Leave the key empty and this step is skipped, so search is unchanged. Leave `relationships` empty and the names are still stored. A name in the alias list is also stored when the file contains it, once the key is set. A failed model call is retried on a later pass, and those alias names are still written.
+
+Edit `ontology.yaml`, then redeploy. The service reads the chunks already stored and writes the links again. The embeddings stay.
 
 | Key | Value |
 | --- | --- |
 | `EXTRACTION_API_KEY` | The model key. Empty means no graph. |
 | `EXTRACTION_BASE_URL` | The blueprint sets OpenCode Go, which uses `/chat/completions`. A Claude API key uses `https://api.anthropic.com/v1` and a Claude model name. When this variable is unset, the code uses `https://api.openai.com/v1`. |
 | `EXTRACTION_MODEL` | The blueprint sets `deepseek-v4.1-flash`. When this variable is unset, the code uses `gpt-4o-mini`. |
-
-The file text is sent to that model once, when the file is indexed. The first 20,000 characters are sent. The question is not sent there.
 
 ## Connect the folder
 
@@ -197,7 +216,7 @@ These files are indexed, including files in subfolders:
 
 Pictures, `.doc`, `.xls`, and anything else are skipped. A file over 20 MB is skipped. Removing a file from the folder hides it from search on the next sync.
 
-If Claude still shows only the price list, open the folder's Share dialog and check that the `client_email` is listed as Viewer. Then use **Save and deploy** again, or wait for the next 15-minute check.
+If Claude still shows only the price list, open the folder's Share dialog and check that the `client_email` is listed as Viewer. Then use **Save and deploy** again, or wait for the next 2-minute check.
 
 ## Security
 
@@ -212,7 +231,8 @@ The web service is $25 a month. The 10 GB disk is $2.50 a month. Drive remains t
 ```
 render.yaml           the Blueprint the deploy link reads
 Dockerfile            image, with BGE-small baked in
-app/                  MCP tools and the Drive sync
+ontology.yaml         entity types, relationships, and aliases
+app/                  MCP tools, Drive sync, and the graph
 ```
 
 Schema, the Blueprint, and the Claude steps are in [docs/plan.md](docs/plan.md). Queue and chunk settings are in [docs/tech-specs.md](docs/tech-specs.md).

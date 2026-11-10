@@ -260,13 +260,13 @@ Claude Desktop, when it is the client instead of the website:
 }
 ```
 
-ChatGPT Business can use this URL once the server speaks OAuth. That is a later addition. A static key does not fit ChatGPT's connector.
+ChatGPT Business can use this URL once the server speaks OAuth. The plan is [oauth-chatgpt.md](oauth-chatgpt.md). It is not built. A static key does not fit ChatGPT's connector.
 
 ## Later additions
 
 | Need | How |
 | --- | --- |
-| ChatGPT | OAuth on the MCP endpoint, so ChatGPT can connect without making the folder public |
+| ChatGPT | [oauth-chatgpt.md](oauth-chatgpt.md). OAuth on this container, so ChatGPT can connect without making the folder public |
 | Salesforce (live queries) | A second MCP server in the client config |
 | Salesforce (indexed) | `sync_salesforce.py`, same replace path as Drive |
 | Confluence / Notion / Jira | One script per source, same replace path |
