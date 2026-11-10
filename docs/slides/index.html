@@ -256,23 +256,23 @@
     </section>
 
     <section class="slide" data-label="Security">
-      <h2>One key sees the whole folder</h2>
-      <p class="sub">Claude sends a bearer key. ChatGPT has nowhere to put that key.</p>
+      <h2>One password sees the whole folder</h2>
+      <p class="sub">Claude and ChatGPT both sign in. The URL stays closed.</p>
       <div class="body">
         <div class="split rise" style="--d: 0.05s">
           <div class="cd">
-            <p class="n">Claude, this room</p>
-            <h3>Bearer, no OAuth</h3>
-            <p>The connector URL ends in /mcp. The header is Authorization: Bearer, then MCP_API_KEY. An empty key fails closed. Anyone who has the key can search every file.</p>
+            <p class="n">No authentication</p>
+            <h3>The folder would be public</h3>
+            <p>ChatGPT can connect with OAuth, or with nothing. Nothing would let anyone search every file. This deploy does not offer that.</p>
           </div>
           <div class="cd pl">
-            <p class="n">Not on this service yet</p>
-            <h3>OAuth, then WorkOS</h3>
-            <p>ChatGPT’s connector is OAuth, or no authentication. An open URL would publish the folder. OAuth is the plan for ChatGPT. Sign-in by company email is WorkOS, and it comes after that.</p>
+            <p class="n">This deploy</p>
+            <h3>OAuth, one shared password</h3>
+            <p>The email is owner@company-brain.local. Render generates the password. Both clients sign in with it. The code returns only to Claude or ChatGPT.</p>
           </div>
         </div>
       </div>
-      <p class="cap">The key does not copy each person’s own Drive permissions.</p>
+      <p class="cap">This password does not copy each person’s Drive permissions. A branch swaps it for free WorkOS: each person signs in, and MFA sits on their own account.</p>
     </section>
 
     <section class="slide" data-label="Connectors">
@@ -351,7 +351,7 @@
       <article data-for="9">
         <h3>Security</h3>
         <p class="k">Slide 10</p>
-        <p>Render generates MCP_API_KEY. Claude sends Authorization: Bearer and that key. There is no OAuth on this connector. One key searches the whole folder. The service does not apply each person’s Google Drive permissions. ChatGPT cannot store a bearer key. Its choices are OAuth or an open URL, and an open URL would publish the folder. OAuth is written up in docs/oauth-chatgpt.md and is not built. WorkOS, sign-in by company email, is later still.</p>
+        <p>This room ships OAuth. Claude and ChatGPT both sign in as owner@company-brain.local with the password Render generates. The code returns only to those two clients. Tokens expire. The password is stored as a hash. Anyone with it can search every file. The service does not apply each person’s Google Drive permissions. A bearer key still works, and it reaches the same folder. Say that this is the slightly better lock: the URL is not public, and ChatGPT can actually sign in. It is still one shared password. The WorkOS branch is the upgrade, and it is not in this image. Free WorkOS, a login per person, and MFA on that login. Offer the branch. Do not pretend this password is that.</p>
       </article>
       <article data-for="10">
         <h3>Connectors</h3>
